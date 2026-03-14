@@ -1,0 +1,27 @@
+{
+  "description": "Safety guards for Codex CLI invocations — warns on full-auto mode, blocks dangerous mode, monitors exit codes",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "tool == 'Bash' && tool_input.command matches 'codex exec.*--full-auto'",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[codex-collab] WARNING: Codex will run in --full-auto mode and may modify files in the working directory. Ensure you have git commits for rollback.' >&2"
+          }
+        ],
+        "description": "Warn before Codex full-auto execution that may modify files"
+      },
+      {
+        "matcher": "tool == 'Bash' && tool_input.command matches 'codex.*dangerously'",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[codex-collab] BLOCKED: --dangerously-bypass-approvals-and-sandbox is not allowed.' >&2; exit 2"
+          }
+        ],
+        "description": "Block dangerous Codex execution modes"
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "codex-collab-local",
+  "owner": {
+    "name": "jguru"
+  },
+  "metadata": {
+    "description": "Claude Code ↔ OpenAI Codex CLI collaboration plugin",
+    "version": "1.1.0"
+  },
+  "plugins": [
+    {
+      "name": "codex-collab",
+      "source": "./",
+      "description": "Claude Code에서 OpenAI Codex CLI를 호출하여 협업",
+      "version": "1.1.0",
+      "keywords": ["codex", "openai", "collaboration", "cross-model"]
+    }
+  ]
+}
