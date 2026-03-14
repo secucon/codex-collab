@@ -1,0 +1,5 @@
+.DS_Store
+*.log
+.claude/*.local.md
+node_modules/
+/tmp/
