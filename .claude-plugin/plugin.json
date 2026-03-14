@@ -13,6 +13,5 @@
     "./agents/codex-delegator.md",
     "./agents/cross-verifier.md",
     "./agents/rule-engine.md"
-  ],
-  "hooks": "./hooks/hooks.json"
+  ]
 }
