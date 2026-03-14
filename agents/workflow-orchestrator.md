@@ -64,14 +64,38 @@ Route directly to `session-manager`:
 7. **Record**: Call `session-manager` to append history with `structured_result`
 8. **Display**: Present the cross-verification report
 
-### `/codex-debate <topic>` (Phase 4)
+### `/codex-debate <topic>`
 
-1. Session check via `session-manager`
-2. Multi-round orchestration (max 5 rounds)
-3. Each round: `codex-delegator` → Codex position → Claude counter-position
-4. Consensus check via `agrees_with_opponent` field
-5. Record history
-6. Display final report
+1. **Session check**: Call `session-manager` to get active session
+   - No active session → error: "Run `/codex-session start <name>` first"
+2. **Initialize debate**: Construct initial prompt with topic and context
+   - Use `schema-builder` skill's debate schema for `--output-schema`
+3. **Round loop** (max 5 rounds):
+   a. **Codex turn**: Pass topic (round 1) or Claude's counter-position (round 2+) to `codex-delegator`
+      - Use `resume` with Codex session ID for rounds 2+
+      - `--output-schema` for structured position JSON
+   b. **Parse Codex response**: Extract position, confidence, key_arguments, agrees_with_opponent
+   c. **Consensus check**: If `agrees_with_opponent == true` → exit loop
+   d. **Claude turn**: Generate Claude's counter-position as structured JSON
+      - Independent analysis — do NOT simply agree
+      - Include counterpoints to Codex's arguments
+   e. **Consensus check**: If Claude agrees → exit loop
+4. **Compile report**: Summarize all rounds, final positions, key arguments
+5. **Rule engine**: Pass final result to `rule-engine` for any triggered rules
+6. **Record**: Call `session-manager` to append history with full debate record
+7. **Display**: Present the debate report
+
+#### Debate Error Recovery
+
+- Codex CLI failure mid-debate: 1 retry, then partial completion with rounds so far
+- If failure on round 1: report error, no partial result
+- Partial completion format: same report but with note "토론이 라운드 N에서 중단됨"
+
+#### Anti-Anchoring in Debate
+
+- Round 1: Claude does NOT share its opinion before Codex responds
+- Each round: Claude generates its position BEFORE reading Codex's response in detail
+- Counterpoints should address Codex's specific arguments, not just restate Claude's position
 
 ## Mode Detection Logic
 

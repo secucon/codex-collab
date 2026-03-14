@@ -81,15 +81,20 @@ Codex에게 질문하거나 작업을 위임합니다. Ask Codex a question or d
 - read/write 모드 자동 판단 (Auto-detects read-only vs write mode)
 - write 모드 시 사용자 확인 필수 (Write mode requires user confirmation)
 
-### `/codex-evaluate <target>` *(Phase 2)*
+### `/codex-evaluate <target>`
 
 Codex가 코드를 평가하고 Claude가 교차 검증합니다. Codex evaluates code, Claude cross-verifies.
 
-### `/codex-debate <topic>` *(Phase 4)*
+- `--output-schema`로 구조화된 결과 (Structured results via --output-schema)
+- 세션 내 이전 평가와 추이 비교 (Trend comparison within session)
+
+### `/codex-debate <topic>`
 
 Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
 
 - 최대 5라운드, 조기 합의 시 종료 (Max 5 rounds, early consensus exit)
+- 구조화 JSON으로 입장 교환 (Structured JSON position exchange)
+- 앵커링 방지 프로토콜 적용 (Anti-anchoring protocol)
 
 ---
 
@@ -103,6 +108,7 @@ Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
 | `session-manager` | 세션 CRUD, 프로젝트별 필터링. Session lifecycle management. |
 | `codex-delegator` | 순수 CLI 호출 + 응답 파싱. Pure CLI invocation + response parsing. |
 | `cross-verifier` | 교차 검증 (evaluate 필수 단계). Cross-verification. |
+| `rule-engine` | 조건-액션 규칙 평가, 자동 후속 커맨드. Condition-action rules. |
 
 ### Skills / 스킬
 
@@ -110,6 +116,7 @@ Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
 |-------|------|
 | `codex-invocation` | CLI 호출 패턴, 플래그, 에러 처리. CLI patterns and error handling. |
 | `session-management` | 세션 저장소, 스키마, CRUD 로직. Session storage and CRUD logic. |
+| `schema-builder` | output-schema 동적 생성. JSON Schema construction. |
 
 ---
 
@@ -125,9 +132,9 @@ Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
 ## Roadmap
 
 - [x] Phase 1: 세션 시스템 + `/codex-ask`
-- [ ] Phase 2: `/codex-evaluate` + 구조화 응답 (`--output-schema`)
-- [ ] Phase 3: 규칙 엔진 + 자동 액션
-- [ ] Phase 4: `/codex-debate` + 자동 토론
+- [x] Phase 2: `/codex-evaluate` + 구조화 응답 (`--output-schema`)
+- [x] Phase 3: 규칙 엔진 + 자동 액션
+- [x] Phase 4: `/codex-debate` + 자동 토론
 
 ---
 
