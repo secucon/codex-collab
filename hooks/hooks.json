@@ -1,5 +1,5 @@
 {
-  "description": "Safety guards for Codex CLI invocations — warns on full-auto mode, blocks dangerous mode, monitors exit codes",
+  "description": "Safety guards for Codex CLI invocations — session-level notifications, write-mode warnings, dangerous mode blocking",
   "hooks": {
     "PreToolUse": [
       {

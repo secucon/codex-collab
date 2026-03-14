@@ -1,8 +1,20 @@
-# codex-collab
+# codex-collab v2
 
-**Claude Code에서 OpenAI Codex CLI(GPT-5.4)를 호출하여 두 AI 모델 간 협업을 구현하는 플러그인**
+**Claude Code에서 OpenAI Codex CLI(GPT-5.4)를 호출하여 세션 기반 크로스 모델 협업을 구현하는 플러그인**
 
-A Claude Code plugin that invokes OpenAI Codex CLI (GPT-5.4) for cross-model collaboration — task delegation, code review, verification, and second opinions.
+A Claude Code plugin for session-based cross-model collaboration with OpenAI Codex CLI (GPT-5.4) — task delegation, evaluation, and automated debate.
+
+---
+
+## What's New in v2 / v2 변경사항
+
+v2는 v1의 클린 브레이크입니다. 주요 변경:
+
+- **세션 필수**: 모든 커맨드가 세션 안에서만 동작 (이력 추적)
+- **커맨드 재설계**: 행위 기반 4개 커맨드 (`ask`, `evaluate`, `debate`, `session`)
+- **에이전트 계층화**: `workflow-orchestrator` 중심 계층 구조
+- **구조화 응답**: `--output-schema`로 JSON 구조화 결과
+- **자동 토론**: Claude↔Codex 간 최대 5라운드 자동 토론 (Phase 4)
 
 ---
 
@@ -28,64 +40,94 @@ claude plugin add ./
 
 ---
 
-## Commands / 명령어
+## Quick Start / 빠른 시작
 
-### `/codex <prompt>`
+```bash
+# 1. 세션 시작
+/codex-session start 리팩토링 작업
 
-Codex CLI에 작업을 위임하고 결과를 받아옵니다.
-Delegates a task to Codex CLI and returns the result.
+# 2. Codex에게 질문
+/codex-ask 이 함수의 시간 복잡도를 분석해줘
 
-- 분석/리뷰 → read-only 모드 (기본)
-- 파일 생성/수정 → `--full-auto` 모드 (사용자 확인 후)
+# 3. 코드 평가 (Phase 2)
+/codex-evaluate src/auth.ts
 
-### `/codex-review [--base <branch>] [--commit <sha>]`
+# 4. 자동 토론 (Phase 4)
+/codex-debate 이 모듈을 클래스로 리팩토링해야 할까?
 
-Codex의 내장 코드 리뷰 기능으로 독립적인 코드 리뷰를 받습니다.
-Gets an independent code review from Codex's built-in review feature.
-
-- 인자 없음 → uncommitted 변경사항 리뷰
-- `--base main` → 브랜치 비교 리뷰
-
-### `/codex-verify [what to verify]`
-
-Claude가 작성한 코드/설계를 Codex에게 독립 검증받습니다.
-Cross-verifies Claude's work with an independent Codex assessment.
-
-구조화된 리포트 출력: 합의 / 불일치 / 주의사항 / 결론
-
-### `/codex-opinion <question>`
-
-설계/코드/기술 질문에 대해 Codex로부터 세컨드 오피니언을 받습니다.
-Gets a second opinion from Codex on design, code, or technical questions.
-
-Claude와 Codex의 관점을 나란히 비교하여 제시합니다. 앵커링 바이어스를 방지하기 위해 Claude의 결론을 Codex에 노출하지 않습니다.
+# 5. 세션 종료
+/codex-session end
+```
 
 ---
 
-## Agents / 에이전트
+## Commands / 명령어
 
-| Agent | Description |
-|-------|-------------|
-| `codex-delegator` | 작업을 Codex에 위임하고 결과를 해석합니다. Orchestrates task delegation to Codex CLI. |
-| `cross-verifier` | Claude의 작업을 Codex로 독립 검증합니다. Cross-verifies Claude's output with Codex. |
+### `/codex-session <start|end|delete|list>`
 
-## Skills / 스킬
+세션 생명주기를 관리합니다. Manages session lifecycle.
 
-| Skill | Description |
-|-------|-------------|
-| `codex-invocation` | Codex CLI 호출 패턴, 플래그, 출력 처리, 에러 복구 가이드. Invocation patterns, flags, output handling, and error recovery. |
+| Subcommand | Description |
+|------------|-------------|
+| `start <name>` | 새 세션 시작. Start a new session. |
+| `end` | 활성 세션 종료. End active session. |
+| `delete <id>` | 세션 영구 삭제. Permanently delete a session. |
+| `list` | 현재 프로젝트 세션 목록. List sessions for current project. |
+
+### `/codex-ask <prompt>`
+
+Codex에게 질문하거나 작업을 위임합니다. Ask Codex a question or delegate a task.
+
+- read/write 모드 자동 판단 (Auto-detects read-only vs write mode)
+- write 모드 시 사용자 확인 필수 (Write mode requires user confirmation)
+
+### `/codex-evaluate <target>` *(Phase 2)*
+
+Codex가 코드를 평가하고 Claude가 교차 검증합니다. Codex evaluates code, Claude cross-verifies.
+
+### `/codex-debate <topic>` *(Phase 4)*
+
+Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
+
+- 최대 5라운드, 조기 합의 시 종료 (Max 5 rounds, early consensus exit)
+
+---
+
+## Architecture / 아키텍처
+
+### Agents / 에이전트
+
+| Agent | Role |
+|-------|------|
+| `workflow-orchestrator` | 모든 커맨드의 상위 오케스트레이터. Top-level orchestrator. |
+| `session-manager` | 세션 CRUD, 프로젝트별 필터링. Session lifecycle management. |
+| `codex-delegator` | 순수 CLI 호출 + 응답 파싱. Pure CLI invocation + response parsing. |
+| `cross-verifier` | 교차 검증 (evaluate 필수 단계). Cross-verification. |
+
+### Skills / 스킬
+
+| Skill | Role |
+|-------|------|
+| `codex-invocation` | CLI 호출 패턴, 플래그, 에러 처리. CLI patterns and error handling. |
+| `session-management` | 세션 저장소, 스키마, CRUD 로직. Session storage and CRUD logic. |
 
 ---
 
 ## Safety / 안전장치
 
-이 플러그인은 PreToolUse 훅을 통해 안전장치를 제공합니다:
+- `--full-auto` 사용 시 경고 (Warns on full-auto mode)
+- `--dangerously-bypass-approvals-and-sandbox` 차단 (Blocks dangerous mode)
+- write 모드 자동 판단 시 사용자 확인 필수 (Write mode requires confirmation)
+- 세션 데이터는 `~/.claude/codex-sessions/`에 저장 (프로젝트 트리 외부)
 
-This plugin provides safety guards via PreToolUse hooks:
+---
 
-- `--full-auto` 사용 시 경고 메시지 표시 (파일 수정 가능성 알림)
-- `--dangerously-bypass-approvals-and-sandbox` 사용 차단 (exit code 2)
-- 모든 Codex 출력은 `/tmp/`에만 저장 — 프로젝트 트리 오염 방지
+## Roadmap
+
+- [x] Phase 1: 세션 시스템 + `/codex-ask`
+- [ ] Phase 2: `/codex-evaluate` + 구조화 응답 (`--output-schema`)
+- [ ] Phase 3: 규칙 엔진 + 자동 액션
+- [ ] Phase 4: `/codex-debate` + 자동 토론
 
 ---
 

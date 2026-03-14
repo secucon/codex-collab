@@ -19,7 +19,7 @@ Resolved dynamically. Ensure `codex` is in your PATH. Auth is handled automatica
 CODEX=$(command -v codex)
 OUTPUT=/tmp/codex-collab-$(date +%s).md
 
-$CODEX exec --ephemeral \
+$CODEX exec \
   -o "$OUTPUT" \
   -C "$(pwd)" \
   -s read-only \
@@ -32,25 +32,82 @@ $CODEX exec --ephemeral \
 
 | Flag | Purpose | When to Use |
 |------|---------|-------------|
-| `--ephemeral` | No session persistence | Always (one-shot tasks) |
 | `-o <file>` | Write final message to file | Always (clean output capture) |
 | `-C <dir>` | Set working directory | Always (match current project) |
 | `-s read-only` | Read-only sandbox | Default for analysis/review |
 | `-s workspace-write` | Allow file writes | When Codex needs to modify files |
 | `--full-auto` | Shorthand for `-a on-request -s workspace-write` | When delegating file-modifying tasks (sandboxed) |
+| `--ephemeral` | No session persistence | One-shot tasks only (NOT default in v2) |
 | `-m <model>` | Override model | When specific model is needed |
 | `--json` | JSONL output to stdout | When intermediate events are needed |
+| `--output-schema <schema>` | Structured JSON response | When structured data is needed |
+
+## Session Management Flags
+
+| Flag | Purpose | When to Use |
+|------|---------|-------------|
+| `resume <session_id>` | Resume an existing session | Multi-turn conversations |
+| `fork <session_id>` | Fork a session into a new branch | Exploring alternative directions |
+
+### Resume Example
+```bash
+$CODEX exec resume <SESSION_ID> \
+  -o "$OUTPUT" \
+  -C "$(pwd)" \
+  "Follow-up prompt"
+```
+
+### Fork Example
+```bash
+$CODEX exec fork <SESSION_ID> \
+  -o "$OUTPUT" \
+  -C "$(pwd)" \
+  "Try a different approach"
+```
+
+## Structured Output with --output-schema
+
+Request structured responses by providing a JSON Schema:
+
+```bash
+$CODEX exec \
+  -o "$OUTPUT" \
+  -C "$(pwd)" \
+  -s read-only \
+  --output-schema '{
+    "type": "object",
+    "properties": {
+      "issues": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "severity": {"type": "string", "enum": ["low","medium","high","critical"]},
+            "file": {"type": "string"},
+            "line": {"type": "integer"},
+            "description": {"type": "string"}
+          }
+        }
+      },
+      "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+      "summary": {"type": "string"}
+    }
+  }' \
+  "Review this code for issues"
+```
+
+The response in the output file will be valid JSON matching the schema.
 
 ## Invocation Modes
 
 ### Read-Only (Default — Analysis, Review, Opinion)
 ```bash
-$CODEX exec --ephemeral -o "$OUTPUT" -C "$(pwd)" -s read-only "prompt"
+$CODEX exec -o "$OUTPUT" -C "$(pwd)" -s read-only "prompt"
 ```
 
 ### File-Modifying (Task Delegation — sandboxed workspace-write)
 ```bash
-$CODEX exec --ephemeral -o "$OUTPUT" -C "$(pwd)" --full-auto "prompt"
+$CODEX exec -o "$OUTPUT" -C "$(pwd)" --full-auto "prompt"
 ```
 > `--full-auto`는 완전 자율 모드가 아닌 `-a on-request --sandbox workspace-write`의 축약형입니다.
 
@@ -66,14 +123,15 @@ $CODEX exec review --base main -o "$OUTPUT" -C "$(pwd)"
 2. Use the Read tool to read the output file after Codex completes
 3. The `-o` flag gives only the clean final message, not intermediate JSONL noise
 4. Present results with attribution: "**Codex (GPT-5.4) 응답:**"
+5. For `--output-schema` responses, parse as JSON for structured handling
 
 ## Error Handling
 
 | Error | Detection | Recovery |
 |-------|-----------|----------|
 | Auth failure | stderr contains "auth" or "login" | Suggest `codex login` |
-| Timeout | Bash timeout (300s) exceeded | Retry with simpler prompt |
-| Empty output | Output file is empty or missing | Check stderr, retry |
+| Timeout | Bash timeout (300s) exceeded | 1 retry, then partial completion |
+| Empty output | Output file is empty or missing | Check stderr, 1 retry |
 | Non-zero exit | Exit code ≠ 0 | Report stderr to user |
 
 ## Timeout
