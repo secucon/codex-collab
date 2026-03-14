@@ -14,7 +14,7 @@ v2는 v1의 클린 브레이크입니다. 주요 변경:
 - **커맨드 재설계**: 행위 기반 4개 커맨드 (`ask`, `evaluate`, `debate`, `session`)
 - **에이전트 계층화**: `workflow-orchestrator` 중심 계층 구조
 - **구조화 응답**: `--output-schema`로 JSON 구조화 결과
-- **자동 토론**: Claude↔Codex 간 최대 5라운드 자동 토론 (Phase 4)
+- **자동 토론**: Claude↔Codex 간 최대 5라운드 자동 토론
 
 ---
 
@@ -156,6 +156,22 @@ Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
 | `session-management` | 세션 저장소, 스키마, CRUD 로직. Session storage and CRUD logic. |
 | `schema-builder` | output-schema 동적 생성. JSON Schema construction. |
 
+### Schemas / 스키마
+
+| Schema | Location |
+|--------|----------|
+| Evaluation | [`schemas/evaluation.json`](schemas/evaluation.json) — 코드 평가 결과 구조 |
+| Debate | [`schemas/debate.json`](schemas/debate.json) — 토론 라운드 입장 구조 |
+
+### Validation / 검증
+
+```bash
+bash scripts/validate-plugin.sh
+```
+
+플러그인 구조 무결성을 검증합니다 (plugin.json, 파일 참조, 스키마, hooks).
+Validates plugin structural integrity (37 checks).
+
 ---
 
 ## Rules Configuration / 규칙 설정
@@ -227,8 +243,18 @@ rules:
 
 ## Safety / 안전장치
 
-- `--full-auto` 사용 시 경고 (Warns on full-auto mode)
-- `--dangerously-bypass-approvals-and-sandbox` 차단 (Blocks dangerous mode)
+4개의 PreToolUse 안전 훅이 Codex CLI 호출을 감시합니다:
+
+Four PreToolUse safety hooks guard Codex CLI invocations:
+
+| Hook | Action |
+|------|--------|
+| `--full-auto` 감지 | 경고 메시지 표시 (Warning) |
+| `--dangerously-*` 감지 | **차단 — exit 2** (Blocked) |
+| write 모드 감지 | 파일 변경 인지 경고 (Write-mode awareness) |
+| 세션 없이 Codex 호출 | 프로젝트별 세션 확인 후 경고 (Session warning, project-scoped) |
+
+추가 안전장치 (Additional safeguards):
 - write 모드 자동 판단 시 사용자 확인 필수 (Write mode requires confirmation)
 - 세션 데이터는 `~/.claude/codex-sessions/`에 저장 (프로젝트 트리 외부)
 - 규칙 엔진 자동 액션 체인 최대 깊이: **3** (Rule engine auto-action chain max depth: 3)
