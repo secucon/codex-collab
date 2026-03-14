@@ -18,6 +18,44 @@ v2는 v1의 클린 브레이크입니다. 주요 변경:
 
 ---
 
+## Upgrading from v1 / v1에서 업그레이드
+
+v2는 v1의 **클린 브레이크(breaking change)** 입니다. 기존 커맨드가 변경되었습니다.
+
+v2 is a **breaking change** from v1. All commands have been redesigned.
+
+```bash
+# 플러그인 업데이트
+claude plugin update codex-collab
+```
+
+### Command Migration / 커맨드 변경 대응표
+
+| v1 (제거됨) | v2 (대체) | 비고 |
+|------------|-----------|------|
+| `/codex <prompt>` | `/codex-ask <prompt>` | 세션 필수. 먼저 `/codex-session start` 실행 |
+| `/codex-opinion <question>` | `/codex-ask <question>` | ask로 통합, read-only 자동 판단 |
+| `/codex-review` | `/codex-evaluate` | 교차 검증 필수 포함, 구조화 결과 |
+| `/codex-verify` | `/codex-evaluate` | review와 통합 |
+| *(없음)* | `/codex-session` | **신규** — 세션 관리 (필수) |
+| *(없음)* | `/codex-debate` | **신규** — 자동 토론 |
+
+### Key Difference / 핵심 차이
+
+v1에서는 바로 `/codex`를 실행할 수 있었지만, v2에서는 **반드시 세션을 먼저 시작**해야 합니다:
+
+```bash
+# v1 (바로 실행)
+/codex 이 코드를 분석해줘
+
+# v2 (세션 먼저)
+/codex-session start 분석 작업
+/codex-ask 이 코드를 분석해줘
+/codex-session end
+```
+
+---
+
 ## Prerequisites / 사전 요구사항
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI 설치 및 인증
@@ -49,10 +87,10 @@ claude plugin add ./
 # 2. Codex에게 질문
 /codex-ask 이 함수의 시간 복잡도를 분석해줘
 
-# 3. 코드 평가 (Phase 2)
+# 3. 코드 평가
 /codex-evaluate src/auth.ts
 
-# 4. 자동 토론 (Phase 4)
+# 4. 자동 토론
 /codex-debate 이 모듈을 클래스로 리팩토링해야 할까?
 
 # 5. 세션 종료
