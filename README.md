@@ -184,14 +184,14 @@ Built-in defaults ← Global ← Project
 ```bash
 # 예제 파일을 프로젝트 규칙으로 복사
 mkdir -p .codex-collab
-cp rules.yaml.example .codex-collab/rules.yaml
+cp docs/rules.yaml.example .codex-collab/rules.yaml
 
 # 또는 글로벌 규칙으로 복사
-cp rules.yaml.example ~/.claude/codex-rules.yaml
+cp docs/rules.yaml.example ~/.claude/codex-rules.yaml
 ```
 
-전체 규칙 스키마와 예제는 [`rules.yaml.example`](rules.yaml.example)을 참조하세요.
-For the full rule schema and examples, see [`rules.yaml.example`](rules.yaml.example).
+전체 규칙 스키마와 예제는 [`docs/rules.yaml.example`](docs/rules.yaml.example)을 참조하세요.
+For the full rule schema and examples, see [`docs/rules.yaml.example`](docs/rules.yaml.example).
 
 ### Rule Example / 규칙 예시
 

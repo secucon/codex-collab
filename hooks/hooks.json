@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "SESSION_FILE=$(ls ~/.claude/codex-sessions/*.json 2>/dev/null | xargs grep -l '\"status\": \"active\"' 2>/dev/null | head -1); if [ -z \"$SESSION_FILE\" ]; then echo '[codex-collab] SESSION WARNING: No active codex-collab session detected. Run \"/codex-session start <name>\" to start a session before using Codex commands. Session history will not be recorded for this invocation.' >&2; fi"
+            "command": "SESSION_FILE=$(ls ~/.claude/codex-sessions/*.json 2>/dev/null | xargs grep -l '\"status\": \"active\"' 2>/dev/null | while read f; do if grep -q \"\\\"project\\\": \\\"$(pwd)\\\"\" \"$f\" 2>/dev/null; then echo \"$f\"; break; fi; done); if [ -z \"$SESSION_FILE\" ]; then echo '[codex-collab] SESSION WARNING: No active codex-collab session for this project ($(pwd)). Run \"/codex-session start <name>\" first. Session history will not be recorded.' >&2; fi"
           }
         ],
         "description": "Warn when Codex CLI is invoked without an active codex-collab session — session history will not be captured"

@@ -134,7 +134,7 @@ rules:
       value: 5                     # More than 5 issues total
     then:
       action: "notify"
-      message: "⚠️  이슈 {issues[].length}개 발견됨 — 순차 수정을 권장합니다 (many issues found, consider incremental fixes)"
+      message: "⚠️  이슈가 5개 이상 발견됨 — 순차 수정을 권장합니다 (many issues found, consider incremental fixes)"
 
   # ---------------------------------------------------------------------------
   # EXAMPLE 4 — Poor Quality Gate
