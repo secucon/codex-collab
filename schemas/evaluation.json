@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-collab/schemas/evaluation.json",
+  "title": "CodexEvaluation",
+  "description": "Canonical output schema for /codex-evaluate — structured code-quality assessment produced by Codex CLI via --output-schema. Single source of truth; all references in commands/codex-evaluate.md and skills/schema-builder/SKILL.md should defer to this file.",
+  "type": "object",
+  "properties": {
+    "issues": {
+      "type": "array",
+      "description": "List of code issues discovered during evaluation. May be empty if no issues are found.",
+      "items": {
+        "type": "object",
+        "description": "A single code issue identified by the evaluator.",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Impact level: low = style/cosmetic, medium = correctness risk, high = likely bug, critical = security/data-loss."
+          },
+          "category": {
+            "type": "string",
+            "enum": ["bug", "security", "performance", "style", "logic"],
+            "description": "Classification of the issue type."
+          },
+          "file": {
+            "type": "string",
+            "description": "Relative file path (from project root) where the issue was found. Omit if not file-specific."
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1-based line number of the issue within the file. Omit if not line-specific."
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable explanation of the issue."
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Recommended fix or improvement for this issue."
+          }
+        },
+        "required": ["severity", "category", "description"],
+        "additionalProperties": false
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Model confidence in the correctness of this evaluation result (0.0 = no confidence, 1.0 = fully confident)."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short narrative summary (2–5 sentences) of the overall evaluation findings."
+    },
+    "strengths": {
+      "type": "array",
+      "description": "Positive aspects of the code identified during evaluation. May be empty.",
+      "items": {
+        "type": "string",
+        "description": "A single identified strength."
+      }
+    },
+    "overall_quality": {
+      "type": "string",
+      "enum": ["excellent", "good", "acceptable", "needs_improvement", "poor"],
+      "description": "Coarse overall quality rating derived from the issues found and code strengths."
+    }
+  },
+  "required": ["issues", "confidence", "summary", "overall_quality"],
+  "additionalProperties": false
+}

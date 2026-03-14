@@ -9,54 +9,33 @@ Codex CLI의 `--output-schema` 플래그에 전달할 JSON Schema를 커맨드 �
 
 ## Pre-built Schemas
 
+> **Canonical schema files** are the single source of truth. Do **not** duplicate schema content here.
+> Read the file directly when you need to pass a schema to `--output-schema`.
+
 ### Evaluation Schema
 
 `/codex-evaluate`에서 사용. 코드 품질 평가 결과를 구조화합니다.
 
-```json
-{
-  "type": "object",
-  "properties": {
-    "issues": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
-          "category": {"type": "string", "enum": ["bug", "security", "performance", "style", "logic"]},
-          "file": {"type": "string"},
-          "line": {"type": "integer"},
-          "description": {"type": "string"},
-          "suggestion": {"type": "string"}
-        },
-        "required": ["severity", "category", "description"]
-      }
-    },
-    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-    "summary": {"type": "string"},
-    "strengths": {"type": "array", "items": {"type": "string"}},
-    "overall_quality": {"type": "string", "enum": ["excellent", "good", "acceptable", "needs_improvement", "poor"]}
-  },
-  "required": ["issues", "confidence", "summary", "overall_quality"]
-}
+**Canonical file:** [`schemas/evaluation.json`](../../schemas/evaluation.json)
+
+Key fields: `issues[]` (severity, category, description), `confidence`, `summary`, `overall_quality`.
+To inline for CLI use, read the file at runtime:
+
+```bash
+SCHEMA=$(cat schemas/evaluation.json)
 ```
 
 ### Debate Schema
 
 `/codex-debate`에서 사용 (Phase 4). 각 라운드의 입장을 구조화합니다.
 
-```json
-{
-  "type": "object",
-  "properties": {
-    "position": {"type": "string"},
-    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-    "key_arguments": {"type": "array", "items": {"type": "string"}},
-    "agrees_with_opponent": {"type": "boolean"},
-    "counterpoints": {"type": "array", "items": {"type": "string"}}
-  },
-  "required": ["position", "confidence", "key_arguments", "agrees_with_opponent"]
-}
+**Canonical file:** [`schemas/debate.json`](../../schemas/debate.json)
+
+Key fields: `position`, `confidence`, `key_arguments[]`, `agrees_with_opponent`, `counterpoints[]`.
+To inline for CLI use, read the file at runtime:
+
+```bash
+SCHEMA=$(cat schemas/debate.json)
 ```
 
 ## Schema Construction Pattern
@@ -89,11 +68,14 @@ Codex CLI의 `--output-schema` 플래그에 전달할 JSON Schema를 커맨드 �
 CODEX=$(command -v codex)
 OUTPUT=/tmp/codex-collab-$(date +%s).md
 
+# Load canonical schema from file (no duplication)
+SCHEMA=$(cat schemas/evaluation.json)
+
 $CODEX exec \
   -o "$OUTPUT" \
   -C "$(pwd)" \
   -s read-only \
-  --output-schema '<json_schema_here>' \
+  --output-schema "$SCHEMA" \
   "Your evaluation prompt"
 ```
 

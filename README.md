@@ -158,12 +158,80 @@ Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
 
 ---
 
+## Rules Configuration / 규칙 설정
+
+`rule-engine` agent는 커맨드 실행 결과에 따라 자동으로 후속 액션을 트리거합니다.
+The `rule-engine` agent triggers automatic follow-up actions based on command results.
+
+### Rule Files / 규칙 파일 위치
+
+| 위치 | 경로 | 우선순위 |
+|------|------|----------|
+| 글로벌 (전체 프로젝트 적용) | `~/.claude/codex-rules.yaml` | 낮음 |
+| 프로젝트 (현재 프로젝트만 적용) | `.codex-collab/rules.yaml` | 높음 |
+
+같은 `name`의 규칙은 프로젝트 규칙이 글로벌 규칙을 완전히 덮어씁니다.
+Project rules with the same `name` entirely replace global rules.
+
+로딩 우선순위 (Loading priority):
+```
+기본 내장 규칙 ← 글로벌 규칙 ← 프로젝트 규칙
+Built-in defaults ← Global ← Project
+```
+
+### Quickstart / 빠른 설정
+
+```bash
+# 예제 파일을 프로젝트 규칙으로 복사
+mkdir -p .codex-collab
+cp rules.yaml.example .codex-collab/rules.yaml
+
+# 또는 글로벌 규칙으로 복사
+cp rules.yaml.example ~/.claude/codex-rules.yaml
+```
+
+전체 규칙 스키마와 예제는 [`rules.yaml.example`](rules.yaml.example)을 참조하세요.
+For the full rule schema and examples, see [`rules.yaml.example`](rules.yaml.example).
+
+### Rule Example / 규칙 예시
+
+```yaml
+rules:
+  # 신뢰도가 낮으면 자동 재평가 / Re-evaluate when confidence is low
+  - name: "low-confidence-reeval"
+    when:
+      command: "codex-evaluate"
+      field: "confidence"
+      operator: "<"
+      value: 0.5
+    then:
+      action: "run"
+      command: "codex-evaluate"
+      message: "신뢰도가 낮아 재평가합니다 (confidence: {confidence})"
+
+  # Critical 이슈 발견 시 토론 시작 / Start debate on critical issues
+  - name: "critical-issue-debate"
+    when:
+      command: "codex-evaluate"
+      field: "issues[].severity"
+      operator: "contains"
+      value: "critical"
+    then:
+      action: "run"
+      command: "codex-debate"
+      args: "Critical issue: {issues[0].description}"
+      message: "심각한 이슈가 발견되어 토론을 시작합니다"
+```
+
+---
+
 ## Safety / 안전장치
 
 - `--full-auto` 사용 시 경고 (Warns on full-auto mode)
 - `--dangerously-bypass-approvals-and-sandbox` 차단 (Blocks dangerous mode)
 - write 모드 자동 판단 시 사용자 확인 필수 (Write mode requires confirmation)
 - 세션 데이터는 `~/.claude/codex-sessions/`에 저장 (프로젝트 트리 외부)
+- 규칙 엔진 자동 액션 체인 최대 깊이: **3** (Rule engine auto-action chain max depth: 3)
 
 ---
 

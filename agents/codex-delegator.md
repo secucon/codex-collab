@@ -33,33 +33,69 @@ You receive from `workflow-orchestrator`:
 
 ### New Invocation (no existing Codex session)
 
+When `session_id` is `null`, use `--json` flag to capture the Codex session ID from JSONL stdout while also writing clean output to the `-o` file:
+
 ```bash
 CODEX=$(command -v codex)
 OUTPUT=/tmp/codex-collab-$(date +%s).md
+JSONL=/tmp/codex-collab-$(date +%s)-events.jsonl
 
-# Read-only mode
+# Read-only mode — capture JSONL for session ID extraction
 $CODEX exec \
   -o "$OUTPUT" \
   -C "<working_directory>" \
   -s read-only \
-  "<prompt>"
+  --json \
+  "<prompt>" 2>/dev/null | tee "$JSONL"
 
-# Write mode
+# Write mode — capture JSONL for session ID extraction
 $CODEX exec \
   -o "$OUTPUT" \
   -C "<working_directory>" \
   --full-auto \
-  "<prompt>"
+  --json \
+  "<prompt>" 2>/dev/null | tee "$JSONL"
 ```
+
+### Session ID Capture
+
+After the first invocation, extract the Codex session ID from the JSONL event stream. Codex CLI emits a `session` event containing the session identifier:
+
+```bash
+# Extract session_id from JSONL output (emitted on session start or first event)
+CODEX_SESSION_ID=$(grep -m1 '"session_id"' "$JSONL" \
+  | python3 -c "import sys,json; data=json.loads(sys.stdin.read()); print(data.get('session_id',''))" 2>/dev/null)
+
+# Fallback: scan all JSONL lines for session_id field
+if [ -z "$CODEX_SESSION_ID" ]; then
+  CODEX_SESSION_ID=$(cat "$JSONL" | while IFS= read -r line; do
+    echo "$line" | python3 -c "
+import sys, json
+try:
+    d = json.loads(sys.stdin.read())
+    sid = d.get('session_id') or (d.get('session') or {}).get('id', '')
+    if sid: print(sid)
+except: pass
+" 2>/dev/null && break
+  done)
+fi
+```
+
+The extracted `CODEX_SESSION_ID` must be returned in the response and stored by `session-manager` as `codex_session_id` in the session JSON file. This enables session continuity across subsequent commands.
 
 ### Resume Existing Session
 
+When `session_id` is provided (non-null), use the `resume` subcommand with the stored Codex session ID. **Do NOT use `--json` on resume** — clean output via `-o` is sufficient:
+
 ```bash
+# Resume using the stored codex_session_id from session-manager
 $CODEX exec resume <session_id> \
   -o "$OUTPUT" \
   -C "<working_directory>" \
   "<follow-up prompt>"
 ```
+
+> **Important**: The `<session_id>` here is `codex_session_id` from the session JSON file — the Codex CLI's own session handle, NOT the codex-collab internal session ID (e.g., `codex-1710400000-a1b2`).
 
 ### With Output Schema
 
@@ -72,12 +108,31 @@ $CODEX exec \
   "<prompt>"
 ```
 
+When using `--output-schema` on a new invocation, also add `--json` to capture the session ID (see Session ID Capture above).
+
 ## Execution
 
 1. Set Bash timeout to `300000` (5 minutes)
 2. Execute the appropriate CLI command
 3. Read the output file using Read tool
-4. Return the parsed response to `workflow-orchestrator`
+4. If new session (no prior `session_id`): extract `CODEX_SESSION_ID` from JSONL
+5. Return the parsed response and `session_id` to `workflow-orchestrator`
+
+## Return Contract
+
+After every invocation, return a structured response to `workflow-orchestrator`:
+
+```json
+{
+  "status": "success" | "error",
+  "output": "<parsed text from output file>",
+  "session_id": "<extracted CODEX_SESSION_ID or null if extraction failed>",
+  "error": "<stderr message or null>"
+}
+```
+
+- `session_id`: **Always included** — either the newly captured Codex session ID (new invocation) or the same `session_id` passed in (resume). Set to `null` only if extraction genuinely failed.
+- `workflow-orchestrator` must persist a non-null `session_id` back to `session-manager` as `codex_session_id`.
 
 ## Error Handling
 

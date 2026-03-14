@@ -21,6 +21,26 @@
           }
         ],
         "description": "Block dangerous Codex execution modes"
+      },
+      {
+        "matcher": "tool == 'Bash' && tool_input.command matches 'codex.*(--write|--edit|-w ).*'",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[codex-collab] WRITE-MODE ENFORCEMENT: Codex is about to make file changes. Review the prompt carefully. If this was triggered by /codex-ask, user confirmation should have been obtained by workflow-orchestrator before this call.' >&2; if [ \"${CODEX_WRITE_CONFIRMED:-0}\" != '1' ]; then echo '[codex-collab] Set CODEX_WRITE_CONFIRMED=1 to bypass this check or use /codex-ask which handles confirmation automatically.' >&2; fi"
+          }
+        ],
+        "description": "Enforce write-mode awareness — ensure user is aware when Codex will modify files"
+      },
+      {
+        "matcher": "tool == 'Bash' && tool_input.command matches 'codex '",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "SESSION_FILE=$(ls ~/.claude/codex-sessions/*.json 2>/dev/null | xargs grep -l '\"status\": \"active\"' 2>/dev/null | head -1); if [ -z \"$SESSION_FILE\" ]; then echo '[codex-collab] SESSION WARNING: No active codex-collab session detected. Run \"/codex-session start <name>\" to start a session before using Codex commands. Session history will not be recorded for this invocation.' >&2; fi"
+          }
+        ],
+        "description": "Warn when Codex CLI is invoked without an active codex-collab session — session history will not be captured"
       }
     ]
   }

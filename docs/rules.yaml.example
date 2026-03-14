@@ -1,0 +1,312 @@
+# =============================================================================
+# codex-collab — Rules Configuration Example
+# =============================================================================
+#
+# PURPOSE
+# -------
+# This file documents every option available in a codex-collab rules config.
+# Copy it to one of the two supported locations and edit to your needs:
+#
+#   Global (applies to every project):
+#     ~/.claude/codex-rules.yaml
+#
+#   Project-local (overrides global for this repo only):
+#     <project-root>/.codex-collab/rules.yaml
+#
+# MERGE PRIORITY
+# --------------
+# Built-in defaults  ←  Global rules  ←  Project-local rules
+#
+# A project-local rule with the SAME `name` as a global rule completely
+# replaces that global rule. Rules with unique names are merged (additive).
+# Built-in defaults are always available as a final fallback.
+#
+# SCHEMA OVERVIEW
+# ---------------
+# rules:
+#   - name:   <string>      Unique identifier for this rule (required)
+#     when:                 Trigger condition (required)
+#       command:  <string>  Which command's output to inspect (required)
+#       field:    <string>  Dot-path or bracket-path into the result JSON
+#       operator: <string>  Comparison operator (see full list below)
+#       value:    <any>     Right-hand side of the comparison
+#     then:                 Action to execute when condition is true (required)
+#       action:  <string>   "run" | "notify"
+#       command: <string>   (run only) Which command to invoke
+#       args:    <string>   (run only) Arguments / prompt for the command
+#       message: <string>   Human-readable message shown in the UI
+#
+# SUPPORTED OPERATORS
+# -------------------
+#   <           Numeric less-than
+#   >           Numeric greater-than
+#   ==          Strict equality (string or number)
+#   !=          Inequality
+#   contains    Array field contains the given value
+#   count>      Array field item-count is greater than the given number
+#
+# TEMPLATE VARIABLES IN `message` / `args`
+# -----------------------------------------
+# Curly-brace tokens are expanded from the structured result at rule-fire time.
+#
+#   {confidence}                      result.confidence (number 0–1)
+#   {summary}                         result.summary (string)
+#   {overall_quality}                 result.overall_quality (enum string)
+#   {issues[0].description}           First issue's description
+#   {issues[?severity=='critical']}   All critical issues (JSON array)
+#
+# ACTIONS
+# -------
+#   notify   Display `message` only; no command is executed. Safe for alerts.
+#   run      Execute `command` with optional `args`. If the target command
+#            operates in write-mode, workflow-orchestrator will ask the user
+#            for confirmation before proceeding (same safety policy as
+#            /codex-ask). Auto-action chains are capped at depth 3 to prevent
+#            infinite loops.
+#
+# =============================================================================
+
+rules:
+
+  # ---------------------------------------------------------------------------
+  # EXAMPLE 1 — Low-Confidence Re-evaluation
+  # ---------------------------------------------------------------------------
+  # Use case: Automatically re-run /codex-evaluate when Codex is not confident
+  # enough in its assessment. Useful for complex or ambiguous code where a
+  # second pass with fresh context often produces a better result.
+  #
+  # Operator: <  (numeric less-than)
+  # Action:   run — re-invoke the same evaluate command automatically
+  #
+  # NOTE: Because /codex-evaluate is read-only, no user confirmation is needed.
+  # ---------------------------------------------------------------------------
+  - name: "low-confidence-reeval"
+    when:
+      command: "codex-evaluate"     # Only triggers after /codex-evaluate
+      field: "confidence"           # result.confidence (0.0 – 1.0)
+      operator: "<"
+      value: 0.5                    # Fire when confidence is below 50 %
+    then:
+      action: "run"
+      command: "codex-evaluate"     # Re-run the same evaluation
+      # args omitted — re-evaluates the same target as the previous run
+      message: "신뢰도 {confidence} — 자동 재평가 중 (confidence too low, re-evaluating)"
+
+  # ---------------------------------------------------------------------------
+  # EXAMPLE 2 — Critical Issue → Automatic Debate
+  # ---------------------------------------------------------------------------
+  # Use case: When /codex-evaluate finds a critical-severity issue, immediately
+  # open a /codex-debate to discuss the best remediation approach.
+  #
+  # Operator: contains — checks whether any item in issues[].severity equals
+  #           "critical". The bracket path `issues[].severity` tells the rule
+  #           engine to project the `severity` field across every element of
+  #           the `issues` array and treat the result as a set.
+  # ---------------------------------------------------------------------------
+  - name: "critical-issue-debate"
+    when:
+      command: "codex-evaluate"
+      field: "issues[].severity"   # Inspects severity across ALL issues
+      operator: "contains"
+      value: "critical"
+    then:
+      action: "run"
+      command: "codex-debate"
+      # Template variable interpolated at runtime:
+      args: "Critical issue found: {issues[0].description}"
+      message: "심각한 이슈 발견 — 자동 토론 시작 (critical issue detected, starting debate)"
+
+  # ---------------------------------------------------------------------------
+  # EXAMPLE 3 — High Issue Count Notification
+  # ---------------------------------------------------------------------------
+  # Use case: Simply alert the user when there are many issues without
+  # automatically triggering another command. Good for high-noise codebases
+  # where you want awareness without risking auto-action chain runaway.
+  #
+  # Operator: count>  — fires when the issues array has more than N elements
+  # Action:   notify  — display-only, no command executed
+  # ---------------------------------------------------------------------------
+  - name: "high-issue-count-alert"
+    when:
+      command: "codex-evaluate"
+      field: "issues[]"            # The full issues array
+      operator: "count>"
+      value: 5                     # More than 5 issues total
+    then:
+      action: "notify"
+      message: "⚠️  이슈 {issues[].length}개 발견됨 — 순차 수정을 권장합니다 (many issues found, consider incremental fixes)"
+
+  # ---------------------------------------------------------------------------
+  # EXAMPLE 4 — Poor Quality Gate
+  # ---------------------------------------------------------------------------
+  # Use case: Treat "poor" overall_quality as a hard gate. Notify the team and
+  # automatically start a debate on the root cause before any further work.
+  #
+  # Operator: == (strict string equality against the overall_quality enum)
+  # Enum values: excellent | good | acceptable | needs_improvement | poor
+  # ---------------------------------------------------------------------------
+  - name: "poor-quality-gate"
+    when:
+      command: "codex-evaluate"
+      field: "overall_quality"
+      operator: "=="
+      value: "poor"
+    then:
+      action: "run"
+      command: "codex-debate"
+      args: "코드 품질이 poor로 평가됨. 근본 원인과 개선 방향을 논의해줘. 요약: {summary}"
+      message: "🚨 품질 게이트 실패 (poor) — 토론을 통해 개선 방향을 수립합니다"
+
+  # ---------------------------------------------------------------------------
+  # EXAMPLE 5 — Excellent Quality Positive Feedback
+  # ---------------------------------------------------------------------------
+  # Use case: Reward high-confidence, excellent-quality submissions with a
+  # brief positive notification. Useful in CI-style review workflows.
+  #
+  # Chaining conditions:  codex-collab supports only ONE condition per rule.
+  # To express "quality is excellent AND confidence > 0.9", create two rules
+  # that each issue a `notify`. Both will fire independently.
+  # ---------------------------------------------------------------------------
+  - name: "excellent-quality-praise"
+    when:
+      command: "codex-evaluate"
+      field: "overall_quality"
+      operator: "=="
+      value: "excellent"
+    then:
+      action: "notify"
+      message: "✅ 우수한 코드 품질 확인 (confidence: {confidence}) — 릴리스 준비 완료"
+
+  # ---------------------------------------------------------------------------
+  # EXAMPLE 6 — High Confidence Praise (companion to Example 5)
+  # ---------------------------------------------------------------------------
+  - name: "high-confidence-praise"
+    when:
+      command: "codex-evaluate"
+      field: "confidence"
+      operator: ">"
+      value: 0.9
+    then:
+      action: "notify"
+      message: "💯 높은 신뢰도({confidence})로 평가 완료 — 결과를 신뢰할 수 있습니다"
+
+  # ---------------------------------------------------------------------------
+  # EXAMPLE 7 — Security Issue → Immediate Notify
+  # ---------------------------------------------------------------------------
+  # Use case: Any security-category issue should generate an immediate,
+  # highly-visible notification regardless of severity level.
+  #
+  # Operator: contains — matches if ANY issue has category == "security"
+  # ---------------------------------------------------------------------------
+  - name: "security-issue-alert"
+    when:
+      command: "codex-evaluate"
+      field: "issues[].category"   # Project the category field across all issues
+      operator: "contains"
+      value: "security"
+    then:
+      action: "notify"
+      message: "🔐 보안 이슈 발견: {issues[?category=='security']}  — 즉시 검토 필요"
+
+  # ---------------------------------------------------------------------------
+  # EXAMPLE 8 — Debate Consensus Reached Notification
+  # ---------------------------------------------------------------------------
+  # Use case: After /codex-debate concludes, notify when a clear consensus was
+  # reached (high confidence in the final position).
+  #
+  # NOTE: /codex-debate produces a per-round schema (schemas/debate.json).
+  #       The rule-engine receives the FINAL round's structured result.
+  #       Fields: position, confidence, key_arguments, agrees_with_opponent
+  # ---------------------------------------------------------------------------
+  - name: "debate-consensus-reached"
+    when:
+      command: "codex-debate"
+      field: "agrees_with_opponent"
+      operator: "=="
+      value: true                  # Boolean true — consensus was reached
+    then:
+      action: "notify"
+      message: "🤝 합의 도달! 최종 입장: {position}"
+
+  # ---------------------------------------------------------------------------
+  # EXAMPLE 9 — Debate Deadlock Detection
+  # ---------------------------------------------------------------------------
+  # Use case: If the final debate round shows very low confidence on both
+  # sides, no consensus was reached. Suggest a follow-up human review.
+  # ---------------------------------------------------------------------------
+  - name: "debate-low-confidence-alert"
+    when:
+      command: "codex-debate"
+      field: "confidence"
+      operator: "<"
+      value: 0.4
+    then:
+      action: "notify"
+      message: "⚡ 토론에서 합의 미달 (confidence: {confidence}) — 인간 검토를 권장합니다"
+
+  # ---------------------------------------------------------------------------
+  # EXAMPLE 10 — Suppress / Override a Built-in Rule (project-local)
+  # ---------------------------------------------------------------------------
+  # Use case: Your project has strict linting that keeps confidence above 0.5
+  # anyway, so the built-in "low-confidence-reeval" rule would never fire and
+  # you want to disable the built-in critical-issue-alert (notify-only) in
+  # favour of a more aggressive auto-debate version.
+  #
+  # HOW TO OVERRIDE: Give the rule the SAME `name` as the built-in rule you
+  # want to replace. The project-local rule wins completely.
+  #
+  # Built-in rule being replaced: "critical-issue-alert" (notify-only)
+  # Replacement: run a debate instead of just notifying
+  # ---------------------------------------------------------------------------
+  - name: "critical-issue-alert"   # Same name as built-in → full override
+    when:
+      command: "codex-evaluate"
+      field: "issues[].severity"
+      operator: "contains"
+      value: "critical"
+    then:
+      action: "run"                # Upgraded from "notify" to "run"
+      command: "codex-debate"
+      args: "Critical security/logic issue needs resolution: {issues[0].description}"
+      message: "⚠️ Critical 이슈 → 즉시 토론 시작 (overrides built-in notify-only rule)"
+
+# =============================================================================
+# CONFIGURATION TIPS
+# =============================================================================
+#
+# 1. AUTO-ACTION CHAIN DEPTH
+#    Rules triggered by rule-engine actions can themselves trigger further
+#    rules. The chain is capped at depth 3 to prevent infinite loops. If
+#    depth 3 is reached, no further auto-actions fire and the user sees:
+#      "[codex-collab] 자동 액션 체인 최대 깊이(3)에 도달했습니다"
+#
+# 2. WRITE-MODE SAFETY
+#    If an `action: run` targets a command that makes file changes (e.g.,
+#    /codex-ask with a write-mode prompt), workflow-orchestrator will ask the
+#    user for confirmation before executing — consistent with the plugin's
+#    interactive write-mode policy.
+#
+# 3. DISABLING A RULE WITHOUT DELETING IT
+#    Comment out the `then` block or rename the rule with a leading "_":
+#      - name: "_low-confidence-reeval"   # disabled
+#
+# 4. TESTING YOUR RULES
+#    Use the validation script to check syntax before deploying:
+#      node scripts/validate-rules.js ~/.claude/codex-rules.yaml
+#      node scripts/validate-rules.js .codex-collab/rules.yaml
+#
+# 5. MINIMAL WORKING EXAMPLE
+#    If you just want one rule and nothing else, your file only needs:
+#
+#      rules:
+#        - name: "my-rule"
+#          when:
+#            command: "codex-evaluate"
+#            field: "confidence"
+#            operator: "<"
+#            value: 0.6
+#          then:
+#            action: "notify"
+#            message: "Low confidence detected: {confidence}"
+#
+# =============================================================================
