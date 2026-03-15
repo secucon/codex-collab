@@ -35,7 +35,7 @@ Codex CLI must be in your `PATH`. Authentication is handled via OAuth (ChatGPT m
 claude plugin marketplace add secucon/codex-collab
 
 # 2. 플러그인 설치
-claude plugin install codex-collab@secucon-codex-collab
+claude plugin install codex-collab@codex-collab
 ```
 
 ### 로컬 설치 (Local Install — for development)
