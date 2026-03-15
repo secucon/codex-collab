@@ -28,14 +28,21 @@ Codex CLI must be in your `PATH`. Authentication is handled via OAuth (ChatGPT m
 
 ## Installation / 설치
 
+### GitHub 마켓플레이스에서 설치 (From GitHub Marketplace)
+
 ```bash
-claude plugin add codex-collab
+# 1. 마켓플레이스 등록 (최초 1회)
+claude plugin marketplace add secucon/codex-collab
+
+# 2. 플러그인 설치
+claude plugin install codex-collab@secucon-codex-collab
 ```
 
-또는 로컬 설치 (Or install locally):
+### 로컬 설치 (Local Install — for development)
 
 ```bash
-cd /path/to/codex-collab
+git clone https://github.com/secucon/codex-collab.git
+cd codex-collab
 claude plugin add ./
 ```
 

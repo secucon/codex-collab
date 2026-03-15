@@ -1,19 +1,19 @@
 {
-  "name": "codex-collab-local",
+  "name": "secucon-codex-collab",
   "owner": {
     "name": "jguru"
   },
   "metadata": {
-    "description": "Claude Code ↔ OpenAI Codex CLI collaboration plugin",
-    "version": "2.0.0"
+    "description": "Claude Code ↔ OpenAI Codex CLI cross-model collaboration plugin",
+    "version": "2.1.0"
   },
   "plugins": [
     {
       "name": "codex-collab",
       "source": "./",
-      "description": "Claude Code ↔ Codex CLI 세션 기반 크로스 모델 협업",
-      "version": "2.0.0",
-      "keywords": ["codex", "openai", "collaboration", "cross-model", "session", "debate"]
+      "description": "Claude Code ↔ Codex CLI session-based cross-model collaboration",
+      "version": "2.1.0",
+      "keywords": ["codex", "openai", "collaboration", "cross-model", "session", "debate", "evaluate"]
     }
   ]
 }

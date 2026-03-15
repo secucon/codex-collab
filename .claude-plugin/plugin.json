@@ -5,6 +5,9 @@
   "author": {
     "name": "jguru"
   },
+  "repository": "https://github.com/secucon/codex-collab",
+  "license": "MIT",
+  "keywords": ["codex", "openai", "collaboration", "cross-model", "session", "debate", "evaluate"],
   "commands": ["./commands/"],
   "skills": ["./skills/"],
   "agents": [
