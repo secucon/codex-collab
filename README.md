@@ -1,4 +1,4 @@
-# codex-collab v2
+# codex-collab
 
 **Claude Code에서 OpenAI Codex CLI(GPT-5.4)를 호출하여 세션 기반 크로스 모델 협업을 구현하는 플러그인**
 
@@ -6,53 +6,16 @@ A Claude Code plugin for session-based cross-model collaboration with OpenAI Cod
 
 ---
 
-## What's New in v2 / v2 변경사항
+## What's New in v2.1 / v2.1 변경사항
 
-v2는 v1의 클린 브레이크입니다. 주요 변경:
+- **세션 자동 생성**: `/debate`, `/evaluate`, `/ask` 실행 시 세션이 없으면 자동 생성 (v2.0에서는 수동 필수)
+- **프로젝트 설정 파일**: `.codex-collab/config.yaml`로 프로젝트별 기본값 설정 가능
+- **Safety 자동 트리거**: safety hook이 위험을 감지하면 cross-model debate를 자동 제안
+- **Debate 결과 처리**: 합의 시 코드 자동 적용, 비합의 시 4개 선택지, 리포트 자동 저장
+- **자동 상태 요약**: 매 커맨드 실행 후 세션/debate/safety 상태를 3-5줄로 자동 출력
+- **행동적 QA**: Fake Codex mock, 4개 시나리오 자동 테스트, 수동 체크리스트
 
-- **세션 필수**: 모든 커맨드가 세션 안에서만 동작 (이력 추적)
-- **커맨드 재설계**: 행위 기반 4개 커맨드 (`ask`, `evaluate`, `debate`, `session`)
-- **에이전트 계층화**: `workflow-orchestrator` 중심 계층 구조
-- **구조화 응답**: `--output-schema`로 JSON 구조화 결과
-- **자동 토론**: Claude↔Codex 간 최대 5라운드 자동 토론
-
----
-
-## Upgrading from v1 / v1에서 업그레이드
-
-v2는 v1의 **클린 브레이크(breaking change)** 입니다. 기존 커맨드가 변경되었습니다.
-
-v2 is a **breaking change** from v1. All commands have been redesigned.
-
-```bash
-# 플러그인 업데이트
-claude plugin update codex-collab
-```
-
-### Command Migration / 커맨드 변경 대응표
-
-| v1 (제거됨) | v2 (대체) | 비고 |
-|------------|-----------|------|
-| `/codex <prompt>` | `/codex-ask <prompt>` | 세션 필수. 먼저 `/codex-session start` 실행 |
-| `/codex-opinion <question>` | `/codex-ask <question>` | ask로 통합, read-only 자동 판단 |
-| `/codex-review` | `/codex-evaluate` | 교차 검증 필수 포함, 구조화 결과 |
-| `/codex-verify` | `/codex-evaluate` | review와 통합 |
-| *(없음)* | `/codex-session` | **신규** — 세션 관리 (필수) |
-| *(없음)* | `/codex-debate` | **신규** — 자동 토론 |
-
-### Key Difference / 핵심 차이
-
-v1에서는 바로 `/codex`를 실행할 수 있었지만, v2에서는 **반드시 세션을 먼저 시작**해야 합니다:
-
-```bash
-# v1 (바로 실행)
-/codex 이 코드를 분석해줘
-
-# v2 (세션 먼저)
-/codex-session start 분석 작업
-/codex-ask 이 코드를 분석해줘
-/codex-session end
-```
+전체 변경 이력은 [CHANGELOG.md](CHANGELOG.md)를 참조하세요.
 
 ---
 
@@ -81,21 +44,21 @@ claude plugin add ./
 ## Quick Start / 빠른 시작
 
 ```bash
-# 1. 세션 시작
-/codex-session start 리팩토링 작업
-
-# 2. Codex에게 질문
+# Codex에게 질문 (세션이 없으면 자동 생성됨)
 /codex-ask 이 함수의 시간 복잡도를 분석해줘
 
-# 3. 코드 평가
+# 코드 평가 + 교차 검증
 /codex-evaluate src/auth.ts
 
-# 4. 자동 토론
+# 자동 토론
 /codex-debate 이 모듈을 클래스로 리팩토링해야 할까?
 
-# 5. 세션 종료
+# 세션 종료
 /codex-session end
 ```
+
+> v2.1부터 `/codex-session start`를 먼저 실행하지 않아도 됩니다. 세션이 자동 생성됩니다.
+> 명시적으로 세션을 설정하려면 `/codex-session start <이름>`을 사용하세요.
 
 ---
 
@@ -107,7 +70,7 @@ claude plugin add ./
 
 | Subcommand | Description |
 |------------|-------------|
-| `start <name>` | 새 세션 시작. Start a new session. |
+| `start <name>` | 새 세션 시작 (고급 사용). Start a new session (advanced). |
 | `end` | 활성 세션 종료. End active session. |
 | `delete <id>` | 세션 영구 삭제. Permanently delete a session. |
 | `list` | 현재 프로젝트 세션 목록. List sessions for current project. |
@@ -118,6 +81,7 @@ Codex에게 질문하거나 작업을 위임합니다. Ask Codex a question or d
 
 - read/write 모드 자동 판단 (Auto-detects read-only vs write mode)
 - write 모드 시 사용자 확인 필수 (Write mode requires user confirmation)
+- 세션 없으면 자동 생성 (Auto-creates session if none active)
 
 ### `/codex-evaluate <target>`
 
@@ -125,14 +89,46 @@ Codex가 코드를 평가하고 Claude가 교차 검증합니다. Codex evaluate
 
 - `--output-schema`로 구조화된 결과 (Structured results via --output-schema)
 - 세션 내 이전 평가와 추이 비교 (Trend comparison within session)
+- 세션 없으면 자동 생성 (Auto-creates session if none active)
 
 ### `/codex-debate <topic>`
 
 Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
 
-- 최대 5라운드, 조기 합의 시 종료 (Max 5 rounds, early consensus exit)
-- 구조화 JSON으로 입장 교환 (Structured JSON position exchange)
+- 최대 5라운드 + 추가 2라운드, 조기 합의 시 종료 (Max 5+2 rounds, early consensus exit)
+- 합의 시 diff + 근거 표시 → 코드 자동 적용 (Consensus: auto-apply code with approval)
+- 비합의 시 4개 선택지: Claude안 / Codex안 / 추가라운드 / 버리기 (Non-consensus: 4 choices)
+- 리포트 자동 저장 `.codex-collab/reports/` (Auto-save reports)
 - 앵커링 방지 프로토콜 적용 (Anti-anchoring protocol)
+
+---
+
+## Configuration / 설정
+
+v2.1부터 프로젝트별 설정 파일을 지원합니다. 2-tier config hierarchy with project override.
+
+| 위치 | 경로 | 우선순위 |
+|------|------|----------|
+| 글로벌 (Global) | `~/.claude/codex-collab-config.yaml` | 낮음 |
+| 프로젝트 (Project) | `.codex-collab/config.yaml` | 높음 |
+
+```yaml
+# .codex-collab/config.yaml
+session:
+  auto_create: true            # 세션 없으면 자동 생성 (default: true)
+  auto_name_prefix: "auto"     # 자동 생성 세션 이름 접두사
+
+debate:
+  default_rounds: 3            # 기본 토론 라운드 수
+  max_additional_rounds: 2     # 비합의 시 추가 가능 라운드
+
+safety:
+  auto_trigger: true           # safety hook 감지 시 debate 자동 제안
+  require_approval: true       # 자동 트리거 시 사용자 승인 필수 (invariant)
+
+status:
+  auto_summary: true           # 커맨드 실행 후 자동 상태 요약
+```
 
 ---
 
@@ -143,8 +139,8 @@ Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
 | Agent | Role |
 |-------|------|
 | `workflow-orchestrator` | 모든 커맨드의 상위 오케스트레이터. Top-level orchestrator. |
-| `session-manager` | 세션 CRUD, 프로젝트별 필터링. Session lifecycle management. |
-| `codex-delegator` | 순수 CLI 호출 + 응답 파싱. Pure CLI invocation + response parsing. |
+| `session-manager` | 세션 CRUD, 자동 생성, 프로젝트별 필터링. Session lifecycle + auto-create. |
+| `codex-delegator` | 순수 CLI 호출 + 응답 파싱 + session ID 캡처. CLI invocation + session capture. |
 | `cross-verifier` | 교차 검증 (evaluate 필수 단계). Cross-verification. |
 | `rule-engine` | 조건-액션 규칙 평가, 자동 후속 커맨드. Condition-action rules. |
 
@@ -158,10 +154,24 @@ Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
 
 ### Schemas / 스키마
 
-| Schema | Location |
-|--------|----------|
-| Evaluation | [`schemas/evaluation.json`](schemas/evaluation.json) — 코드 평가 결과 구조 |
-| Debate | [`schemas/debate.json`](schemas/debate.json) — 토론 라운드 입장 구조 |
+| Schema | Description |
+|--------|-------------|
+| [`evaluation.json`](schemas/evaluation.json) | 코드 평가 결과. Code evaluation results. |
+| [`debate.json`](schemas/debate.json) | 토론 라운드 입장. Debate round positions. |
+| [`config.json`](schemas/config.json) | 설정 파일 스키마. Config file schema. |
+| [`debate-report.json`](schemas/debate-report.json) | 토론 리포트. Debate report structure. |
+| [`approval-result.json`](schemas/approval-result.json) | 합의 승인 결과. Approval result. |
+
+### Scripts / 스크립트
+
+| Category | Scripts |
+|----------|---------|
+| Config | `load-config.sh` |
+| Session | `session-auto-create.sh` |
+| Safety | `safety-hook-topic.sh` |
+| Debate | `debate-result-handler.sh`, `detect-non-consensus.sh`, `detect-exhaustion.sh`, `debate-round-cap.sh`, `display-consensus-result.sh`, `display-non-consensus-choices.sh`, `debate-result-approval.sh`, `apply-changes.sh` |
+| Reports | `compose-report.sh`, `debate-report.sh` |
+| Status | `status-summary.sh` |
 
 ### Validation / 검증
 
@@ -169,8 +179,8 @@ Claude↔Codex 자동 토론. Automated debate between Claude and Codex.
 bash scripts/validate-plugin.sh
 ```
 
-플러그인 구조 무결성을 검증합니다 (plugin.json, 파일 참조, 스키마, hooks).
-Validates plugin structural integrity (37 checks).
+플러그인 구조 무결성을 검증합니다 (37 checks).
+Validates plugin structural integrity.
 
 ---
 
@@ -179,97 +189,100 @@ Validates plugin structural integrity (37 checks).
 `rule-engine` agent는 커맨드 실행 결과에 따라 자동으로 후속 액션을 트리거합니다.
 The `rule-engine` agent triggers automatic follow-up actions based on command results.
 
-### Rule Files / 규칙 파일 위치
+### Rule Files / 규칙 파일
 
 | 위치 | 경로 | 우선순위 |
 |------|------|----------|
-| 글로벌 (전체 프로젝트 적용) | `~/.claude/codex-rules.yaml` | 낮음 |
-| 프로젝트 (현재 프로젝트만 적용) | `.codex-collab/rules.yaml` | 높음 |
+| 글로벌 | `~/.claude/codex-rules.yaml` | 낮음 |
+| 프로젝트 | `.codex-collab/rules.yaml` | 높음 |
 
-같은 `name`의 규칙은 프로젝트 규칙이 글로벌 규칙을 완전히 덮어씁니다.
-Project rules with the same `name` entirely replace global rules.
-
-로딩 우선순위 (Loading priority):
-```
-기본 내장 규칙 ← 글로벌 규칙 ← 프로젝트 규칙
-Built-in defaults ← Global ← Project
-```
-
-### Quickstart / 빠른 설정
+로딩 우선순위: `기본 내장 ← 글로벌 ← 프로젝트`
 
 ```bash
 # 예제 파일을 프로젝트 규칙으로 복사
 mkdir -p .codex-collab
 cp docs/rules.yaml.example .codex-collab/rules.yaml
-
-# 또는 글로벌 규칙으로 복사
-cp docs/rules.yaml.example ~/.claude/codex-rules.yaml
 ```
 
 전체 규칙 스키마와 예제는 [`docs/rules.yaml.example`](docs/rules.yaml.example)을 참조하세요.
-For the full rule schema and examples, see [`docs/rules.yaml.example`](docs/rules.yaml.example).
-
-### Rule Example / 규칙 예시
-
-```yaml
-rules:
-  # 신뢰도가 낮으면 자동 재평가 / Re-evaluate when confidence is low
-  - name: "low-confidence-reeval"
-    when:
-      command: "codex-evaluate"
-      field: "confidence"
-      operator: "<"
-      value: 0.5
-    then:
-      action: "run"
-      command: "codex-evaluate"
-      message: "신뢰도가 낮아 재평가합니다 (confidence: {confidence})"
-
-  # Critical 이슈 발견 시 토론 시작 / Start debate on critical issues
-  - name: "critical-issue-debate"
-    when:
-      command: "codex-evaluate"
-      field: "issues[].severity"
-      operator: "contains"
-      value: "critical"
-    then:
-      action: "run"
-      command: "codex-debate"
-      args: "Critical issue: {issues[0].description}"
-      message: "심각한 이슈가 발견되어 토론을 시작합니다"
-```
 
 ---
 
 ## Safety / 안전장치
 
-4개의 PreToolUse 안전 훅이 Codex CLI 호출을 감시합니다:
+5개의 안전 훅이 Codex CLI 호출을 감시합니다. Five safety hooks guard Codex CLI invocations:
 
-Four PreToolUse safety hooks guard Codex CLI invocations:
+| Hook | Type | Action |
+|------|------|--------|
+| `--full-auto` 감지 | PreToolUse | 경고 메시지 (Warning) |
+| `--dangerously-*` 감지 | PreToolUse | **차단 — exit 2** (Blocked) |
+| write 모드 감지 | PreToolUse | 파일 변경 경고 (Write-mode awareness) |
+| 세션 없이 Codex 호출 | PreToolUse | 프로젝트별 세션 경고 (Session warning) |
+| Codex 실행 완료 | PostToolUse | 자동 상태 요약 출력 (Auto status summary) |
 
-| Hook | Action |
-|------|--------|
-| `--full-auto` 감지 | 경고 메시지 표시 (Warning) |
-| `--dangerously-*` 감지 | **차단 — exit 2** (Blocked) |
-| write 모드 감지 | 파일 변경 인지 경고 (Write-mode awareness) |
-| 세션 없이 Codex 호출 | 프로젝트별 세션 확인 후 경고 (Session warning, project-scoped) |
-
-추가 안전장치 (Additional safeguards):
-- write 모드 자동 판단 시 사용자 확인 필수 (Write mode requires confirmation)
-- 세션 데이터는 `~/.claude/codex-sessions/`에 저장 (프로젝트 트리 외부)
-- 규칙 엔진 자동 액션 체인 최대 깊이: **3** (Rule engine auto-action chain max depth: 3)
+추가 안전장치:
+- Safety hook `caution+` 감지 시 cross-model debate 자동 제안 (사용자 승인 필수)
+- write 모드 자동 판단 시 사용자 확인 필수
+- 규칙 엔진 자동 액션 체인 최대 깊이: **3**
 
 ---
 
-## Roadmap
+## Testing / 테스트
 
-- [x] Phase 1: 세션 시스템 + `/codex-ask`
-- [x] Phase 2: `/codex-evaluate` + 구조화 응답 (`--output-schema`)
-- [x] Phase 3: 규칙 엔진 + 자동 액션
-- [x] Phase 4: `/codex-debate` + 자동 토론
+### 구조적 검증 (Structural Validation)
+
+```bash
+bash scripts/validate-plugin.sh
+```
+
+### 행동적 테스트 (Behavioral Testing)
+
+```bash
+# 4개 시나리오 자동 테스트 (Fake Codex mock 사용)
+bash tests/run-scenarios.sh
+```
+
+시나리오: happy path E2E, debate resume chain, rule engine cascade, error recovery.
+
+### 수동 체크리스트 (Manual QA)
+
+[`tests/manual-checklist.md`](tests/manual-checklist.md) — 실제 Codex CLI로 시나리오별 검증.
+
+---
+
+## Upgrading / 업그레이드
+
+### v2.0 → v2.1
+
+비파괴적 업그레이드. 기존 v2.0 워크플로우가 그대로 동작합니다.
+
+```bash
+claude plugin update codex-collab
+```
+
+새 기능: 세션 자동 생성 (`session.auto_create: true` 기본값). 비활성화하려면:
+
+```yaml
+# .codex-collab/config.yaml
+session:
+  auto_create: false
+```
+
+### v1 → v2
+
+v2는 v1의 **클린 브레이크(breaking change)** 입니다.
+
+| v1 (제거됨) | v2 (대체) | 비고 |
+|------------|-----------|------|
+| `/codex <prompt>` | `/codex-ask <prompt>` | 세션 자동 생성 (v2.1+) |
+| `/codex-opinion <question>` | `/codex-ask <question>` | ask로 통합 |
+| `/codex-review` | `/codex-evaluate` | 교차 검증 필수 |
+| `/codex-verify` | `/codex-evaluate` | review와 통합 |
+| *(없음)* | `/codex-session` | 세션 관리 |
+| *(없음)* | `/codex-debate` | 자동 토론 |
 
 ---
 
 ## License / 라이선스
 
-[MIT](LICENSE)
+[MIT](LICENSE) | [CHANGELOG](CHANGELOG.md)
