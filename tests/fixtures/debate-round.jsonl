@@ -1,0 +1,6 @@
+{"type":"session.start","session_id":"{{SESSION_ID}}","model":"gpt-5.4","timestamp":"2026-03-15T10:00:00Z"}
+{"type":"message.start","role":"assistant","timestamp":"2026-03-15T10:00:01Z"}
+{"type":"message.delta","content":"{\"position\":\"Classes provide better encapsulation and state management for complex modules"}
+{"type":"message.delta","content":" with multiple internal dependencies.\",\"confidence\":0.75,\"key_arguments\":[\"Encapsulation hides internal state mutations from consumers\",\"Inheritance enables code reuse for similar module variants\",\"IDE tooling provides better autocomplete for class methods\"],\"agrees_with_opponent\":false,\"counterpoints\":[\"Functions can achieve encapsulation through closures\",\"Composition is often preferred over inheritance in modern patterns\"]}"}
+{"type":"message.complete","role":"assistant","timestamp":"2026-03-15T10:00:05Z"}
+{"type":"session.update","session_id":"{{SESSION_ID}}","status":"active","turns":1}

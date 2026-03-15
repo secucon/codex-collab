@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-collab/schemas/config.json",
+  "title": "CodexCollabConfig",
+  "description": "Configuration schema for codex-collab plugin. Supports 2-tier hierarchy: global (~/.codex-collab/config.yaml) overridden by project (.codex-collab/config.yaml).",
+  "type": "object",
+  "properties": {
+    "session": {
+      "type": "object",
+      "description": "Session management settings.",
+      "properties": {
+        "auto_create": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically create a session when a codex-collab command is invoked without an active session."
+        },
+        "auto_name_prefix": {
+          "type": "string",
+          "default": "auto",
+          "description": "Prefix for auto-created session names (e.g., 'auto-1710400000')."
+        }
+      },
+      "additionalProperties": false
+    },
+    "debate": {
+      "type": "object",
+      "description": "Debate command settings.",
+      "properties": {
+        "default_rounds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7,
+          "default": 3,
+          "description": "Default number of debate rounds."
+        },
+        "max_additional_rounds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 2,
+          "description": "Maximum additional rounds beyond default_rounds (hard cap: 2)."
+        },
+        "auto_apply_result": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically apply debate consensus result (requires user approval prompt)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "safety": {
+      "type": "object",
+      "description": "Safety hook and guard settings.",
+      "properties": {
+        "auto_trigger_hooks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically trigger safety hooks on relevant operations."
+        },
+        "require_approval": {
+          "type": "boolean",
+          "default": true,
+          "description": "Always require user approval before auto-triggered debates or write operations. Cannot be set to false."
+        },
+        "block_dangerous_mode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Block --dangerously-bypass-approvals-and-sandbox flag."
+        }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "object",
+      "description": "Status summary settings.",
+      "properties": {
+        "auto_summary": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically display status summary after command completion."
+        },
+        "summary_format": {
+          "type": "string",
+          "enum": ["compact", "detailed"],
+          "default": "compact",
+          "description": "Format for auto-generated status summaries."
+        },
+        "verbosity": {
+          "type": "string",
+          "enum": ["minimal", "normal", "verbose"],
+          "default": "normal",
+          "description": "Verbosity level for status summaries. 'minimal' shows only result, 'normal' includes key metrics, 'verbose' includes full detail."
+        },
+        "max_lines": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20,
+          "description": "Maximum number of lines in auto-generated status summaries."
+        }
+      },
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "object",
+      "description": "Rule engine settings.",
+      "properties": {
+        "max_cascade_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "default": 3,
+          "description": "Maximum rule cascade depth."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable the rule engine."
+        }
+      },
+      "additionalProperties": false
+    },
+    "codex": {
+      "type": "object",
+      "description": "Codex CLI invocation settings.",
+      "properties": {
+        "binary_path": {
+          "type": "string",
+          "default": "codex",
+          "description": "Path to the Codex CLI binary."
+        },
+        "default_model": {
+          "type": "string",
+          "default": "gpt-5.4",
+          "description": "Default Codex model to use."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 600,
+          "default": 120,
+          "description": "Timeout in seconds for Codex CLI invocations."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

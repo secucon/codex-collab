@@ -1,0 +1,6 @@
+{"type":"session.start","session_id":"{{SESSION_ID}}","model":"gpt-5.4","timestamp":"2026-03-15T10:00:00Z"}
+{"type":"message.start","role":"assistant","timestamp":"2026-03-15T10:00:01Z"}
+{"type":"message.delta","content":"Based on the codebase analysis, the authentication module uses JWT with RS256 signing."}
+{"type":"message.delta","content":" The token lifecycle is: (1) issued on login via /api/auth/login, (2) validated per-request by middleware in src/middleware/auth.ts, (3) refreshed via /api/auth/refresh with a 7-day sliding window."}
+{"type":"message.complete","role":"assistant","timestamp":"2026-03-15T10:00:04Z"}
+{"type":"session.update","session_id":"{{SESSION_ID}}","status":"active","turns":1}

@@ -1,0 +1,9 @@
+{"type":"session.start","session_id":"{{SESSION_ID}}","model":"gpt-5.4","timestamp":"2026-03-15T10:00:00Z"}
+{"type":"message.start","role":"assistant","timestamp":"2026-03-15T10:00:01Z"}
+{"type":"tool_use.start","tool":"write_file","target":"src/validators/query-params.ts","timestamp":"2026-03-15T10:00:02Z"}
+{"type":"tool_use.complete","tool":"write_file","target":"src/validators/query-params.ts","status":"success","timestamp":"2026-03-15T10:00:03Z"}
+{"type":"tool_use.start","tool":"edit_file","target":"src/api/routes.ts","timestamp":"2026-03-15T10:00:04Z"}
+{"type":"tool_use.complete","tool":"edit_file","target":"src/api/routes.ts","status":"success","timestamp":"2026-03-15T10:00:05Z"}
+{"type":"message.delta","content":"Applied the requested changes: Added input validation middleware and created Zod schemas."}
+{"type":"message.complete","role":"assistant","timestamp":"2026-03-15T10:00:07Z"}
+{"type":"session.update","session_id":"{{SESSION_ID}}","status":"active","turns":1}

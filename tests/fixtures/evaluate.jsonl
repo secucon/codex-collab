@@ -1,0 +1,5 @@
+{"type":"session.start","session_id":"{{SESSION_ID}}","model":"gpt-5.4","timestamp":"2026-03-15T10:00:00Z"}
+{"type":"message.start","role":"assistant","timestamp":"2026-03-15T10:00:01Z"}
+{"type":"message.delta","content":"{\"issues\":[{\"severity\":\"high\",\"file\":\"src/auth.ts\",\"line\":42,\"description\":\"JWT secret is hardcoded — should use environment variable\"},{\"severity\":\"medium\",\"file\":\"src/api/routes.ts\",\"line\":105,\"description\":\"Missing input validation on user-supplied query parameters\"},{\"severity\":\"low\",\"file\":\"src/utils/format.ts\",\"line\":18,\"description\":\"Unused import: lodash.merge\"}],\"confidence\":0.82,\"summary\":\"Found 3 issues: 1 high severity (hardcoded secret), 1 medium (missing validation), 1 low (unused import).\"}"}
+{"type":"message.complete","role":"assistant","timestamp":"2026-03-15T10:00:06Z"}
+{"type":"session.update","session_id":"{{SESSION_ID}}","status":"active","turns":1}

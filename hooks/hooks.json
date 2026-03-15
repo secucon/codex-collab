@@ -1,15 +1,28 @@
 {
-  "description": "Safety guards for Codex CLI invocations — session-level notifications, write-mode warnings, dangerous mode blocking",
+  "description": "Safety guards for Codex CLI invocations — session-level notifications, write-mode warnings, dangerous mode blocking, and auto status summary on command completion. Each hook emits a structured [SEVERITY:level] tag (caution|warning|critical) for downstream parsing.",
   "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "tool == 'Bash' && tool_input.command matches 'codex exec'",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "SCRIPT_DIR=\"$(cd \"$(dirname \"$(find . -path './scripts/status-summary.sh' -maxdepth 2 2>/dev/null | head -1)\")\" 2>/dev/null && pwd)\"; if [ -f \"${SCRIPT_DIR}/status-summary.sh\" ] && [ -f \"${SCRIPT_DIR}/load-config.sh\" ]; then source \"${SCRIPT_DIR}/load-config.sh\" && load_config 2>/dev/null; source \"${SCRIPT_DIR}/status-summary.sh\"; if should_auto_summary; then generate_status_summary; fi; fi"
+          }
+        ],
+        "description": "Auto status summary after Codex CLI execution completes — displays session state and recent actions (controlled by status.auto_summary config)"
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "tool == 'Bash' && tool_input.command matches 'codex exec.*--full-auto'",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '[codex-collab] WARNING: Codex will run in --full-auto mode and may modify files in the working directory. Ensure you have git commits for rollback.' >&2"
+            "command": "echo '[codex-collab] [SEVERITY:warning] WARNING: Codex will run in --full-auto mode and may modify files in the working directory. Ensure you have git commits for rollback.' >&2"
           }
         ],
+        "severity": "warning",
         "description": "Warn before Codex full-auto execution that may modify files"
       },
       {
@@ -17,9 +30,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '[codex-collab] BLOCKED: --dangerously-bypass-approvals-and-sandbox is not allowed.' >&2; exit 2"
+            "command": "echo '[codex-collab] [SEVERITY:critical] BLOCKED: --dangerously-bypass-approvals-and-sandbox is not allowed.' >&2; exit 2"
           }
         ],
+        "severity": "critical",
         "description": "Block dangerous Codex execution modes"
       },
       {
@@ -27,9 +41,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '[codex-collab] WRITE-MODE ENFORCEMENT: Codex is about to make file changes. Review the prompt carefully. If this was triggered by /codex-ask, user confirmation should have been obtained by workflow-orchestrator before this call.' >&2; if [ \"${CODEX_WRITE_CONFIRMED:-0}\" != '1' ]; then echo '[codex-collab] Set CODEX_WRITE_CONFIRMED=1 to bypass this check or use /codex-ask which handles confirmation automatically.' >&2; fi"
+            "command": "echo '[codex-collab] [SEVERITY:warning] WRITE-MODE ENFORCEMENT: Codex is about to make file changes. Review the prompt carefully. If this was triggered by /codex-ask, user confirmation should have been obtained by workflow-orchestrator before this call.' >&2; if [ \"${CODEX_WRITE_CONFIRMED:-0}\" != '1' ]; then echo '[codex-collab] Set CODEX_WRITE_CONFIRMED=1 to bypass this check or use /codex-ask which handles confirmation automatically.' >&2; fi"
           }
         ],
+        "severity": "warning",
         "description": "Enforce write-mode awareness — ensure user is aware when Codex will modify files"
       },
       {
@@ -37,9 +52,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "SESSION_FILE=$(ls ~/.claude/codex-sessions/*.json 2>/dev/null | xargs grep -l '\"status\": \"active\"' 2>/dev/null | while read f; do if grep -q \"\\\"project\\\": \\\"$(pwd)\\\"\" \"$f\" 2>/dev/null; then echo \"$f\"; break; fi; done); if [ -z \"$SESSION_FILE\" ]; then echo '[codex-collab] SESSION WARNING: No active codex-collab session for this project ($(pwd)). Run \"/codex-session start <name>\" first. Session history will not be recorded.' >&2; fi"
+            "command": "SESSION_FILE=$(ls ~/.claude/codex-sessions/*.json 2>/dev/null | xargs grep -l '\"status\": \"active\"' 2>/dev/null | while read f; do if grep -q \"\\\"project\\\": \\\"$(pwd)\\\"\" \"$f\" 2>/dev/null; then echo \"$f\"; break; fi; done); if [ -z \"$SESSION_FILE\" ]; then echo '[codex-collab] [SEVERITY:caution] SESSION NOTICE: No active codex-collab session for this project ($(pwd)). Run \"/codex-session start <name>\" first. Session history will not be recorded.' >&2; fi"
           }
         ],
+        "severity": "caution",
         "description": "Warn when Codex CLI is invoked without an active codex-collab session — session history will not be captured"
       }
     ]

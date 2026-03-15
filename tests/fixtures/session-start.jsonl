@@ -1,0 +1,5 @@
+{"type":"session.start","session_id":"{{SESSION_ID}}","model":"gpt-5.4","timestamp":"2026-03-15T10:00:00Z"}
+{"type":"message.start","role":"assistant","timestamp":"2026-03-15T10:00:01Z"}
+{"type":"message.delta","content":"Session started successfully. Codex is ready to assist with your project."}
+{"type":"message.complete","role":"assistant","timestamp":"2026-03-15T10:00:03Z"}
+{"type":"session.update","session_id":"{{SESSION_ID}}","status":"active","turns":1}

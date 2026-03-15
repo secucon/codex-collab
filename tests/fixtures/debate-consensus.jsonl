@@ -1,0 +1,5 @@
+{"type":"session.start","session_id":"{{SESSION_ID}}","model":"gpt-5.4","timestamp":"2026-03-15T10:00:00Z"}
+{"type":"message.start","role":"assistant","timestamp":"2026-03-15T10:00:01Z"}
+{"type":"message.delta","content":"{\"position\":\"A hybrid approach using functional core with class wrappers for stateful concerns provides the best balance.\",\"confidence\":0.90,\"key_arguments\":[\"Pure functions for business logic ensure testability\",\"Class wrappers for I/O and state management provide clean interfaces\",\"This pattern aligns with hexagonal architecture principles\"],\"agrees_with_opponent\":true,\"counterpoints\":[]}"}
+{"type":"message.complete","role":"assistant","timestamp":"2026-03-15T10:00:04Z"}
+{"type":"session.update","session_id":"{{SESSION_ID}}","status":"active","turns":3}

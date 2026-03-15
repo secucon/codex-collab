@@ -1,0 +1,19 @@
+# codex-collab project-level config (overrides ~/.claude/codex-collab-config.yaml)
+# See schemas/config.json for schema and scripts/load-config.sh for merge logic.
+#
+# Only specify keys you want to override — missing keys inherit from global/defaults.
+# Deep merge: project values override global at leaf level; nested objects merge recursively.
+
+debate:
+  default_rounds: 3
+
+# safety.require_approval is enforced as true (invariant) regardless of this setting
+safety:
+  require_approval: false
+
+status:
+  verbosity: normal
+  max_lines: 20
+
+codex:
+  timeout_seconds: 60

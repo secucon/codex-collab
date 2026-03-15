@@ -49,6 +49,36 @@ Sessions are stored in `~/.claude/codex-sessions/` as JSON files:
 4. Write session JSON file
 5. Return session ID and confirmation
 
+### Auto-Create (internal — called by `workflow-orchestrator`)
+
+When a command is invoked without an active session and `session.auto_create` is `true` in config:
+
+1. Load config: `source scripts/load-config.sh && load_config`
+2. Read `session.auto_name_prefix` (default: `"auto"`)
+3. Generate session name: `<auto_name_prefix>-<timestamp>` (e.g., `auto-1710400000`)
+4. Follow the same creation flow as `start`:
+   - Check no active session exists for the current project
+   - Create `~/.claude/codex-sessions/` directory if needed
+   - Generate session ID: `codex-$(date +%s)-$(head -c 2 /dev/urandom | xxd -p)`
+   - Write session JSON with additional field: `"auto_created": true`
+5. Return session ID and data to the orchestrator
+
+Auto-created session JSON has one extra field:
+
+```json
+{
+  "id": "<session-id>",
+  "name": "auto-1710400000",
+  "project": "<absolute path>",
+  "auto_created": true,
+  "codex_session_id": null,
+  "created_at": "<ISO 8601>",
+  "ended_at": null,
+  "status": "active",
+  "history": []
+}
+```
+
 ### List (`/codex-session list`)
 
 1. Read all `*.json` files in `~/.claude/codex-sessions/`

@@ -1,0 +1,345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-collab/schemas/debate-report.json",
+  "title": "DebateReport",
+  "description": "Canonical report schema for debate status summaries. Captures the full lifecycle of a debate: topic, trigger cause, participating models, per-round summaries with confidence scores, final result, and chosen action. Used by scripts/status-summary.sh for console output and auto-saved to .codex-collab/reports/. Single source of truth for all report generation and display logic.",
+  "type": "object",
+  "properties": {
+    "report_version": {
+      "type": "string",
+      "const": "2.1.0",
+      "description": "Schema version, aligned with codex-collab release version."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when this report was generated."
+    },
+    "session_id": {
+      "type": "string",
+      "description": "The codex-collab session ID under which this debate occurred."
+    },
+    "session_auto_created": {
+      "type": "boolean",
+      "description": "Whether the session was auto-created from config defaults (true) or manually started via /codex-session start (false)."
+    },
+    "topic": {
+      "type": "string",
+      "description": "The debate topic — either user-provided or auto-derived from safety hook detection content via scripts/safety-hook-topic.sh."
+    },
+    "trigger_cause": {
+      "type": "object",
+      "description": "How and why this debate was initiated.",
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["manual", "auto_trigger", "rule_engine"],
+          "description": "Initiation method: manual (user ran /codex-debate), auto_trigger (safety hook caution+ triggered debate proposal), rule_engine (rule cascade triggered debate)."
+        },
+        "hook_event": {
+          "type": "string",
+          "description": "The safety hook event type that triggered the debate (e.g., 'PreToolUse:file_write', 'PreToolUse:shell'). Present only when source is 'auto_trigger'."
+        },
+        "hook_tool": {
+          "type": "string",
+          "description": "The tool name from the safety hook that triggered the debate (e.g., 'Write', 'Bash'). Present only when source is 'auto_trigger'."
+        },
+        "hook_risk_level": {
+          "type": "string",
+          "enum": ["caution", "block"],
+          "description": "The risk level that triggered the debate proposal. Only 'caution' or higher triggers auto-debate. Present only when source is 'auto_trigger'."
+        },
+        "rule_id": {
+          "type": "string",
+          "description": "The rule ID from the rule engine cascade that triggered the debate. Present only when source is 'rule_engine'."
+        },
+        "user_approved_trigger": {
+          "type": "boolean",
+          "description": "Whether the user approved the auto-triggered debate proposal before it started. Always true for completed debates (blocked proposals are not recorded as reports)."
+        }
+      },
+      "required": ["source"],
+      "additionalProperties": false
+    },
+    "models": {
+      "type": "object",
+      "description": "The two models participating in the debate.",
+      "properties": {
+        "claude": {
+          "type": "object",
+          "description": "Claude model details.",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Claude model identifier (e.g., 'claude-sonnet-4-20250514')."
+            },
+            "role": {
+              "type": "string",
+              "const": "debater",
+              "description": "Role in the debate — always 'debater'."
+            }
+          },
+          "required": ["name", "role"],
+          "additionalProperties": false
+        },
+        "codex": {
+          "type": "object",
+          "description": "Codex CLI model details.",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Codex model identifier (e.g., 'gpt-5.4')."
+            },
+            "role": {
+              "type": "string",
+              "const": "debater",
+              "description": "Role in the debate — always 'debater'."
+            }
+          },
+          "required": ["name", "role"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["claude", "codex"],
+      "additionalProperties": false
+    },
+    "round_config": {
+      "type": "object",
+      "description": "Round configuration including cap enforcement.",
+      "properties": {
+        "default_rounds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Default debate rounds from config (debate.default_rounds)."
+        },
+        "max_additional_rounds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Maximum additional rounds allowed beyond default. Capped at 2 per constraint."
+        },
+        "effective_max_rounds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Computed maximum: default_rounds + min(max_additional_rounds, 2)."
+        }
+      },
+      "required": ["default_rounds", "max_additional_rounds", "effective_max_rounds"],
+      "additionalProperties": false
+    },
+    "rounds": {
+      "type": "array",
+      "description": "Per-round summaries capturing each exchange between Claude and Codex. Ordered by round number.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "description": "Summary of a single debate round.",
+        "properties": {
+          "round_number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1-based round index."
+          },
+          "is_additional": {
+            "type": "boolean",
+            "description": "Whether this round is beyond the default rounds (an additional round requested via 'continue' choice)."
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when this round completed."
+          },
+          "claude_position": {
+            "type": "object",
+            "description": "Claude's position in this round.",
+            "properties": {
+              "position": {
+                "type": "string",
+                "description": "Claude's core stance for this round."
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Claude's confidence score (0.0–1.0)."
+              },
+              "key_arguments": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Claude's supporting arguments."
+              },
+              "agrees_with_opponent": {
+                "type": "boolean",
+                "description": "Whether Claude agrees with Codex's position."
+              }
+            },
+            "required": ["position", "confidence", "key_arguments", "agrees_with_opponent"],
+            "additionalProperties": false
+          },
+          "codex_position": {
+            "type": "object",
+            "description": "Codex's position in this round.",
+            "properties": {
+              "position": {
+                "type": "string",
+                "description": "Codex's core stance for this round."
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Codex's confidence score (0.0–1.0)."
+              },
+              "key_arguments": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Codex's supporting arguments."
+              },
+              "agrees_with_opponent": {
+                "type": "boolean",
+                "description": "Whether Codex agrees with Claude's position."
+              }
+            },
+            "required": ["position", "confidence", "key_arguments", "agrees_with_opponent"],
+            "additionalProperties": false
+          },
+          "convergence": {
+            "type": "object",
+            "description": "Round-level convergence metrics.",
+            "properties": {
+              "divergence_score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "How far apart the positions are (0.0 = identical, 1.0 = fully opposed)."
+              },
+              "trend": {
+                "type": "string",
+                "enum": ["converging", "diverging", "stable"],
+                "description": "Direction of position movement relative to previous round."
+              }
+            },
+            "required": ["divergence_score", "trend"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["round_number", "is_additional", "timestamp", "claude_position", "codex_position", "convergence"],
+        "additionalProperties": false
+      }
+    },
+    "final_result": {
+      "type": "object",
+      "description": "The outcome of the debate after all rounds completed.",
+      "properties": {
+        "consensus_reached": {
+          "type": "boolean",
+          "description": "Whether the two models reached consensus (both agrees_with_opponent = true or divergence_score < threshold)."
+        },
+        "total_rounds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of rounds executed (including any additional rounds)."
+        },
+        "final_divergence_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Divergence score from the final round."
+        },
+        "final_convergence_trend": {
+          "type": "string",
+          "enum": ["converging", "diverging", "stable"],
+          "description": "Convergence trend from the final round."
+        },
+        "claude_final_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Claude's confidence score in the final round."
+        },
+        "codex_final_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Codex's confidence score in the final round."
+        },
+        "winning_position": {
+          "type": "string",
+          "description": "The position that prevailed — either the consensus position or the adopted side's position."
+        },
+        "has_code_changes": {
+          "type": "boolean",
+          "description": "Whether the debate result includes actionable code changes."
+        }
+      },
+      "required": ["consensus_reached", "total_rounds", "final_divergence_score", "claude_final_confidence", "codex_final_confidence", "has_code_changes"],
+      "additionalProperties": false
+    },
+    "chosen_action": {
+      "type": "object",
+      "description": "The action taken on the debate result, derived from user selection in the 4-choice handler or auto-applied consensus.",
+      "properties": {
+        "choice": {
+          "type": "string",
+          "enum": ["apply_consensus", "apply_claude", "apply_codex", "continue", "discard"],
+          "description": "The action chosen: apply_consensus (consensus auto-applied with approval), apply_claude/apply_codex (non-consensus user selection), continue (additional round requested), discard (result rejected)."
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["accepted", "rejected", "continue"],
+          "description": "Normalized decision category: accepted (any apply_*), rejected (discard), continue (additional round)."
+        },
+        "adopted_side": {
+          "type": "string",
+          "enum": ["claude", "codex", "consensus"],
+          "description": "Which side's proposal was adopted. 'consensus' when both agreed."
+        },
+        "applied": {
+          "type": "boolean",
+          "description": "Whether code changes were actually applied to the workspace."
+        },
+        "handler_status": {
+          "type": "string",
+          "enum": ["applied", "informational", "partial_failure", "authorized", "blocked_cap", "discarded"],
+          "description": "Detailed outcome status from the debate-result-handler."
+        },
+        "git_backup_ref": {
+          "type": "string",
+          "description": "Git stash or branch reference created before applying changes (for rollback). Present only when applied is true."
+        }
+      },
+      "required": ["choice", "decision", "applied"],
+      "additionalProperties": false
+    },
+    "summary_text": {
+      "type": "object",
+      "description": "Pre-formatted summary text for console display, generated by scripts/status-summary.sh.",
+      "properties": {
+        "compact": {
+          "type": "string",
+          "description": "3-line compact summary for status.summary_format='compact'."
+        },
+        "detailed": {
+          "type": "string",
+          "description": "5-line detailed summary for status.summary_format='detailed'."
+        }
+      },
+      "required": ["compact", "detailed"],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "report_version",
+    "generated_at",
+    "session_id",
+    "topic",
+    "trigger_cause",
+    "models",
+    "round_config",
+    "rounds",
+    "final_result",
+    "chosen_action",
+    "summary_text"
+  ],
+  "additionalProperties": false
+}
