@@ -61,6 +61,7 @@ After each subcommand completes, run auto status summary (see [Auto Status Summa
 5. **Cross-verify (mandatory)**: Pass Codex's structured result + original code to `cross-verifier`
    - `cross-verifier` performs independent analysis and comparison
    - Returns unified verification report
+   - **Blind Phase validation**: Verify the report contains `"## Claude 독립 분석 (Blind Phase)"` section header BEFORE `"## 교차 비교 (Comparison Phase)"`. If missing or misordered, reject the report and request re-verification from `cross-verifier`
 6. **History comparison**: If previous evaluations exist in session, compare trends
    - Issue count changes (e.g., high 이슈 3→1)
    - Confidence changes

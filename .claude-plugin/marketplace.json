@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Claude Code ↔ OpenAI Codex CLI cross-model collaboration plugin",
-    "version": "2.1.0"
+    "version": "2.2.0"
   },
   "plugins": [
     {
       "name": "codex-collab",
       "source": "./",
       "description": "Claude Code ↔ Codex CLI session-based cross-model collaboration",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "keywords": ["codex", "openai", "collaboration", "cross-model", "session", "debate", "evaluate"]
     }
   ]

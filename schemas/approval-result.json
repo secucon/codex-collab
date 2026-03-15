@@ -3,6 +3,7 @@
   "$id": "https://codex-collab/schemas/approval-result.json",
   "title": "ApprovalResult",
   "description": "Schema for user approval decisions on debate results or auto-triggered actions. Records the user's accept/reject/modify decision along with metadata for session history tracking.",
+  "version": "2.2.0",
   "type": "object",
   "properties": {
     "type": {

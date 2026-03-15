@@ -3,7 +3,7 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "tool == 'Bash' && tool_input.command matches 'codex exec'",
+        "matcher": "tool == 'Bash' && tool_input.command matches '\\bcodex\\s+exec\\b'",
         "hooks": [
           {
             "type": "command",
@@ -15,7 +15,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "tool == 'Bash' && tool_input.command matches 'codex exec.*--full-auto'",
+        "matcher": "tool == 'Bash' && tool_input.command matches '\\bcodex\\s+exec\\b.*--full-auto'",
         "hooks": [
           {
             "type": "command",
@@ -26,7 +26,7 @@
         "description": "Warn before Codex full-auto execution that may modify files"
       },
       {
-        "matcher": "tool == 'Bash' && tool_input.command matches 'codex.*dangerously'",
+        "matcher": "tool == 'Bash' && tool_input.command matches '\\bcodex\\b.*--dangerously-bypass'",
         "hooks": [
           {
             "type": "command",
@@ -37,7 +37,7 @@
         "description": "Block dangerous Codex execution modes"
       },
       {
-        "matcher": "tool == 'Bash' && tool_input.command matches 'codex.*(--write|--edit|-w ).*'",
+        "matcher": "tool == 'Bash' && tool_input.command matches '\\bcodex\\b.*(--write|--edit|-w(\\s|$))'",
         "hooks": [
           {
             "type": "command",
@@ -48,7 +48,7 @@
         "description": "Enforce write-mode awareness — ensure user is aware when Codex will modify files"
       },
       {
-        "matcher": "tool == 'Bash' && tool_input.command matches 'codex '",
+        "matcher": "tool == 'Bash' && tool_input.command matches '\\bcodex\\s+'",
         "hooks": [
           {
             "type": "command",

@@ -3,6 +3,7 @@
   "$id": "https://codex-collab/schemas/debate.json",
   "title": "CodexDebateRound",
   "description": "Canonical per-round output schema for /codex-debate — structured position exchange between Claude and Codex CLI via --output-schema. Both sides (Claude and Codex) produce one instance of this schema per round. Single source of truth; all references in commands/codex-debate.md and skills/schema-builder/SKILL.md should defer to this file.",
+  "version": "2.2.0",
   "type": "object",
   "properties": {
     "position": {

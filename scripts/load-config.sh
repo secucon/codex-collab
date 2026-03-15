@@ -266,10 +266,22 @@ PYEOF
 # ---------------------------------------------------------------------------
 
 load_config() {
+  local project_root_arg="${1:-$CODEX_PROJECT_ROOT}"
+
+  # Skip if config already loaded for the SAME project (performance optimization)
+  if [[ "${CODEX_CONFIG_LOADED:-0}" == "1" && -n "${CODEX_CONFIG_JSON:-}" && "${CODEX_CONFIG_CACHE_KEY:-}" == "$project_root_arg" ]]; then
+    return 0
+  fi
+
   # Validate python3 is available
   if ! command -v python3 &>/dev/null; then
-    echo "[codex-collab] ERROR: python3 is required for config loading" >&2
-    return 1
+    echo "[codex-collab] WARNING: python3 not found — config loading requires python3." >&2
+    echo "[codex-collab] Using hardcoded defaults. Install python3 to enable custom configuration." >&2
+    echo "[codex-collab]   macOS: xcode-select --install  |  Linux: apt install python3" >&2
+    export CODEX_CONFIG_LOADED=0
+    export CODEX_CONFIG_SOURCE="defaults"
+    export CODEX_CONFIG_JSON='{"session":{"auto_create":true,"auto_name_prefix":"auto"},"debate":{"default_rounds":3,"max_additional_rounds":2,"auto_apply_result":false},"safety":{"auto_trigger_hooks":true,"require_approval":true,"block_dangerous_mode":true},"status":{"auto_summary":true,"auto_save":true,"summary_format":"compact","verbosity":"normal","max_lines":20},"rules":{"max_cascade_depth":3,"enabled":true},"codex":{"binary_path":"codex","default_model":"gpt-5.4","timeout_seconds":120}}'
+    return 0
   fi
 
   local project_root="${1:-$CODEX_PROJECT_ROOT}"
@@ -292,6 +304,7 @@ load_config() {
   CODEX_CONFIG_SOURCE=$(echo "$result" | python3 -c "import sys,json; print(json.load(sys.stdin)['_meta']['source'])" 2>/dev/null || echo "defaults")
   export CODEX_CONFIG_JSON
   CODEX_CONFIG_JSON=$(echo "$result" | python3 -c "import sys,json; print(json.dumps(json.load(sys.stdin)['config']))" 2>/dev/null || echo "{}")
+  export CODEX_CONFIG_CACHE_KEY="$project_root_arg"
 
   return 0
 }
@@ -302,8 +315,9 @@ config_get() {
   local default_value="${2:-}"
 
   if ! command -v python3 &>/dev/null; then
+    echo "[codex-collab] WARNING: python3 not found — returning default for '${key}'" >&2
     echo "$default_value"
-    return 1
+    return 0
   fi
 
   # If config is already loaded, query from cached JSON
@@ -391,8 +405,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   CODEX_PROJECT_CONFIG="${PROJECT_ROOT}/.codex-collab/config.yaml"
 
   if ! command -v python3 &>/dev/null; then
-    echo "[codex-collab] ERROR: python3 is required for config loading" >&2
-    exit 1
+    echo "[codex-collab] WARNING: python3 not found — config loading requires python3." >&2
+    echo "[codex-collab] Using hardcoded defaults. Install python3 to enable custom configuration." >&2
+    echo "[codex-collab]   macOS: xcode-select --install  |  Linux: apt install python3" >&2
+    echo '{"_meta":{"source":"defaults","global_status":"skipped","project_status":"skipped"},"config":{"session":{"auto_create":true,"auto_name_prefix":"auto"},"debate":{"default_rounds":3,"max_additional_rounds":2},"safety":{"require_approval":true,"block_dangerous_mode":true},"status":{"auto_summary":true,"verbosity":"normal","max_lines":20},"rules":{"max_cascade_depth":3,"enabled":true},"codex":{"binary_path":"codex","default_model":"gpt-5.4","timeout_seconds":120}}}'
+    exit 0
   fi
 
   export CODEX_DEFAULT_CONFIG_YAML

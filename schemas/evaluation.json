@@ -3,6 +3,7 @@
   "$id": "https://codex-collab/schemas/evaluation.json",
   "title": "CodexEvaluation",
   "description": "Canonical output schema for /codex-evaluate — structured code-quality assessment produced by Codex CLI via --output-schema. Single source of truth; all references in commands/codex-evaluate.md and skills/schema-builder/SKILL.md should defer to this file.",
+  "version": "2.2.0",
   "type": "object",
   "properties": {
     "issues": {

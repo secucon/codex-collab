@@ -7,7 +7,7 @@
   "properties": {
     "report_version": {
       "type": "string",
-      "const": "2.1.0",
+      "const": "2.2.0",
       "description": "Schema version, aligned with codex-collab release version."
     },
     "generated_at": {

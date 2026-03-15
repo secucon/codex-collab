@@ -129,6 +129,23 @@ Rule messages support template variables from the structured result:
 | `{issues[0].description}` | First issue's description |
 | `{issues[?severity=='critical']}` | Filtered issues |
 
+### Shell Injection Prevention (MANDATORY)
+
+Template variables are populated from **external model output** (Codex responses). Before substituting any template variable into a shell command or message displayed via `echo`, you **MUST** sanitize the value to prevent shell injection:
+
+1. **Strip shell metacharacters**: Remove or escape `` ` ``, `$`, `(`, `)`, `;`, `|`, `&`, `>`, `<`, `\n` from all template values
+2. **Use printf %q**: When passing values to shell, use `printf '%q' "$value"` for safe quoting
+3. **Never use `eval`**: Do not `eval` any string containing template variables
+4. **Sanitization function** (apply to every template value before substitution):
+   ```bash
+   sanitize_template_value() {
+     local raw="$1"
+     # Remove dangerous shell metacharacters from external input
+     printf '%s' "$raw" | sed "s/[\`\$();|&<>\\\\\"'#]//g" | tr -d '\n' | head -c 500
+   }
+   ```
+5. **Apply before output**: When rendering `message` or `args` fields, sanitize each `{variable}` replacement value individually, then compose the final string
+
 ## Interface with Workflow Orchestrator
 
 The orchestrator calls you after each command with:

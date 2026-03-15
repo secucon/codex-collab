@@ -1,6 +1,6 @@
 {
   "name": "codex-collab",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Claude Code ↔ OpenAI Codex CLI(GPT-5.4) 크로스 모델 협업 — 세션 기반 작업 위임, 평가, 토론",
   "author": {
     "name": "jguru"

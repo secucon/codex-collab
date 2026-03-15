@@ -31,14 +31,23 @@ Using a single AI coding assistant means being trapped in **one model's biases a
 
 ---
 
-## What's New in v2.1 / v2.1 변경사항
+## What's New in v2.2 / v2.2 변경사항
 
-- **세션 자동 생성**: `/debate`, `/evaluate`, `/ask` 실행 시 세션이 없으면 자동 생성 (v2.0에서는 수동 필수)
-- **프로젝트 설정 파일**: `.codex-collab/config.yaml`로 프로젝트별 기본값 설정 가능
-- **Safety 자동 트리거**: safety hook이 위험을 감지하면 cross-model debate를 자동 제안
-- **Debate 결과 처리**: 합의 시 코드 자동 적용, 비합의 시 4개 선택지, 리포트 자동 저장
-- **자동 상태 요약**: 매 커맨드 실행 후 세션/debate/safety 상태를 3-5줄로 자동 출력
-- **행동적 QA**: Fake Codex mock, 4개 시나리오 자동 테스트, 수동 체크리스트
+### 안정성 & 보안
+- **Shell Injection 방지**: Rule Engine 템플릿 변수에 quote/hash 포함 새니타이제이션 강제
+- **Hook regex 강화**: `\b` 단어 경계로 유사 명령 오탐 방지
+- **python3 graceful degradation**: 미설치 시 경고 + hardcoded 기본값 사용
+
+### 기능 고도화
+- **브랜치별 세션 격리**: 같은 디렉토리에서 브랜치별 독립 세션 운영 (하위 호환 지원)
+- **Anti-Anchoring 강제**: Cross-Verifier에 Blind Phase 필수 섹션 + orchestrator 검증
+- **GitHub Actions CI**: plugin 검증, 단위 테스트, E2E 시나리오 자동화
+
+### 확장성 & 성능
+- **git remote 기반 프로젝트 식별**: 프로젝트 이동 시에도 세션 복구 가능
+- **세션 조회 최적화**: 활성 세션 인덱스 + 3단계 폴백 (exact → legacy → remote)
+- **Config 캐싱**: 프로젝트별 캐시 키 기반 중복 파싱 방지
+- **스키마 버전 관리**: 모든 JSON 스키마에 `version` 필드 추가
 
 전체 변경 이력은 [CHANGELOG.md](CHANGELOG.md)를 참조하세요.
 

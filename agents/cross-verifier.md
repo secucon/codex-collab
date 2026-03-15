@@ -86,9 +86,23 @@ Compare your analysis against Codex's structured output:
 
 Return the complete report to `workflow-orchestrator` for display and session recording.
 
-## Anti-Anchoring Protocol
+## Anti-Anchoring Protocol (ENFORCED)
 
-- Read the code FIRST, form initial impressions
-- THEN compare with Codex's output
+The following execution order is **mandatory** and must be verifiable in the output:
+
+### Step 1: Blind Analysis (BEFORE seeing Codex results)
+- Read the original code/target using Read tool
+- Produce a preliminary findings list (`claude_preliminary_findings`)
+- **Output marker**: Include `"## Claude 독립 분석 (Blind Phase)"` section header in the report
+
+### Step 2: Codex Result Comparison (AFTER blind analysis)
+- Only after Step 1 is complete, read Codex's structured JSON
+- Compare findings side by side
+- **Output marker**: Include `"## 교차 비교 (Comparison Phase)"` section header
+
+### Enforcement Rules
+- The report **MUST** contain both section headers in order (Blind Phase before Comparison Phase)
+- If the Blind Phase section is missing or empty, the orchestrator **MUST** reject the report and request re-verification
+- `claude_preliminary_findings` must list at least one observation (even "no issues found") to prove independent analysis occurred
 - Do NOT simply agree with Codex — provide genuine independent verification
 - If you disagree with Codex, explain why with specific evidence

@@ -3,6 +3,7 @@
   "$id": "https://codex-collab/schemas/config.json",
   "title": "CodexCollabConfig",
   "description": "Configuration schema for codex-collab plugin. Supports 2-tier hierarchy: global (~/.codex-collab/config.yaml) overridden by project (.codex-collab/config.yaml).",
+  "version": "2.2.0",
   "type": "object",
   "properties": {
     "session": {

@@ -25,6 +25,8 @@ Sessions are stored in `~/.claude/codex-sessions/` as JSON files:
   "id": "<session-id>",
   "name": "<user-provided session name>",
   "project": "<absolute path to project directory>",
+  "branch": "<git branch name at session creation>",
+  "git_remote": "<git remote origin URL or empty string>",
   "codex_session_id": null,
   "created_at": "<ISO 8601>",
   "ended_at": null,
@@ -34,6 +36,8 @@ Sessions are stored in `~/.claude/codex-sessions/` as JSON files:
 ```
 
 - `id`: `codex-<timestamp>-<random 4 chars>` (e.g., `codex-1710400000-a1b2`)
+- `branch`: Current git branch at session creation time (via `git rev-parse --abbrev-ref HEAD`). Used for branch-level session isolation — sessions on different branches are independent even in the same project directory
+- `git_remote`: Git remote URL (via `git remote get-url origin 2>/dev/null || echo ""`). Secondary identifier for project matching — allows session recovery when project directory is moved or renamed
 - `codex_session_id`: Populated after first Codex CLI call (from `--json` output)
 - `status`: `active` | `ended`
 - `history`: Array of interaction records (command, timestamp, summary, codex response metadata)
@@ -42,12 +46,14 @@ Sessions are stored in `~/.claude/codex-sessions/` as JSON files:
 
 ### Start (`/codex-session start <name>`)
 
-1. Check if an active session already exists for current project
+1. Detect current git branch: `git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"`
+2. Check if an active session already exists for current project **and branch**
    - If yes, inform user and ask to end it first
-2. Create `~/.claude/codex-sessions/` directory if it doesn't exist
-3. Generate session ID: `codex-$(date +%s)-$(head -c 2 /dev/urandom | xxd -p)`
-4. Write session JSON file
-5. Return session ID and confirmation
+   - Sessions on different branches are independent (no conflict)
+3. Create `~/.claude/codex-sessions/` directory if it doesn't exist
+4. Generate session ID: `codex-$(date +%s)-$(head -c 2 /dev/urandom | xxd -p)`
+5. Write session JSON file (include `"branch": "<detected branch>"`)
+6. Return session ID and confirmation
 
 ### Auto-Create (internal — called by `workflow-orchestrator`)
 
@@ -70,6 +76,7 @@ Auto-created session JSON has one extra field:
   "id": "<session-id>",
   "name": "auto-1710400000",
   "project": "<absolute path>",
+  "branch": "<current git branch>",
   "auto_created": true,
   "codex_session_id": null,
   "created_at": "<ISO 8601>",
@@ -101,9 +108,12 @@ Auto-created session JSON has one extra field:
 
 When other agents need the current session:
 
-1. Glob `~/.claude/codex-sessions/*.json`
-2. Find file where `project == $(pwd)` AND `status == "active"`
-3. Return session data or error "No active session. Run `/codex-session start <name>` first."
+1. Detect current branch: `git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"`
+2. Glob `~/.claude/codex-sessions/*.json`
+3. Find file where `project == $(pwd)` AND `branch == <current branch>` AND `status == "active"`
+   - Fallback 1: if no branch-matched session found, check for sessions with `branch == null` or `branch == "unknown"` (backward compatibility with pre-v2.2 sessions)
+   - Fallback 2: if project path doesn't match but `git_remote` matches current `git remote get-url origin`, treat as same project (handles directory moves/renames)
+4. Return session data or error "No active session. Run `/codex-session start <name>` first."
 
 ## Adding History Entries
 

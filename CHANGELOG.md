@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [2.2.0] - 2026-03-15
+
+### Added
+- **브랜치별 세션 격리**: 세션에 `branch` 필드 추가 — 같은 프로젝트 디렉토리에서 브랜치별 독립 세션 운영 가능
+- **git remote 기반 프로젝트 식별**: `git_remote` 필드로 프로젝트 이동/이름 변경 시에도 세션 복구 가능 (credential 자동 제거)
+- **Shell Injection 방지**: Rule Engine 템플릿 변수에 MANDATORY 새니타이제이션 규칙 추가 (`sanitize_template_value()` 함수, quote/hash 문자 포함)
+- **Anti-Anchoring 강제**: Cross-Verifier에 Blind Phase / Comparison Phase 필수 섹션 헤더 + orchestrator 검증 로직 추가
+- **활성 세션 인덱스**: `.active-sessions.json` 기반 O(1) 세션 조회 최적화 (atomic write 패턴)
+- **GitHub Actions CI**: `.github/workflows/ci.yml` — plugin 검증, config 테스트, 스크립트 단위 테스트, E2E 시나리오 자동 실행
+- **스키마 버전 관리**: 모든 JSON 스키마에 `version: "2.2.0"` 필드 추가 (하위 호환성 관리)
+
+### Changed
+- **Hook regex 강화**: 모든 matcher에 `\b` 단어 경계 추가 — 유사 명령 오탐 방지 (예: `codecx`, `codex-example`)
+- **python3 미설치 대응**: `load-config.sh`에서 오류 대신 경고 + hardcoded 기본값 사용 (graceful degradation)
+- **Config 캐싱**: `load_config()` 호출 시 프로젝트별 캐시 키 기반으로 중복 파싱 방지
+- **세션 조회**: 3단계 폴백 — exact(project+branch) → legacy(branch 없는 세션) → remote(git remote URL 매치)
+- `workflow-orchestrator`: Cross-Verifier Blind Phase 섹션 검증 로직 추가
+- `session-manager`: branch/git_remote 필드 추가, 활성 세션 조회에 branch 조건 반영
+- `session-auto-create.sh`: branch/git_remote 감지, 안전한 python3 호출 (sys.argv 기반)
+- `-w` hook matcher: 마지막 토큰 케이스 대응 (`-w(\s|$)`)
+
+### Security
+- Rule Engine 템플릿에서 `'`, `"`, `#` 문자 제거하여 쉘 브레이크아웃 방지
+- git remote URL 저장 시 credential 자동 제거 (userinfo stripping)
+- GitHub Actions CI에 `permissions: { contents: read }` 최소 권한 적용
+- Hook dangerous mode 패턴을 `--dangerously-bypass`로 정밀 매칭
+
+---
+
 ## [2.1.0] - 2026-03-15
 
 ### Added

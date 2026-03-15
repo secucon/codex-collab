@@ -1,0 +1,90 @@
+name: codex-collab CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Plugin Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate plugin structure
+        run: bash scripts/validate-plugin.sh
+
+      - name: Validate JSON schemas
+        run: |
+          for f in schemas/*.json; do
+            python3 -m json.tool "$f" > /dev/null || { echo "Invalid JSON: $f"; exit 1; }
+          done
+
+      - name: Validate hooks.json
+        run: python3 -m json.tool hooks/hooks.json > /dev/null
+
+      - name: Validate plugin.json
+        run: python3 -m json.tool .claude-plugin/plugin.json > /dev/null
+
+  test-config:
+    name: Config Loader Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run config loader tests
+        run: bash tests/test-config-loader.sh
+
+  test-scripts:
+    name: Script Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make test scripts executable
+        run: chmod +x tests/*.sh scripts/*.sh
+
+      - name: Test session auto-create
+        run: bash tests/test-session-auto-create.sh
+
+      - name: Test safety hook topic
+        run: bash tests/test-safety-hook-topic.sh
+
+      - name: Test status summary
+        run: bash tests/test-status-summary.sh
+
+      - name: Test debate report
+        run: bash tests/test-debate-report.sh
+
+      - name: Test 3-choice exhaustion
+        run: bash tests/test-3choice-exhausted.sh
+
+      - name: Test detect exhaustion
+        run: bash tests/test-detect-exhaustion.sh
+
+      - name: Test non-consensus
+        run: bash tests/test-non-consensus.sh
+
+      - name: Test auto-save report
+        run: bash tests/test-auto-save-report.sh
+
+      - name: Test summary format and save
+        run: bash tests/test-summary-format-and-save.sh
+
+  scenarios:
+    name: E2E Scenarios
+    runs-on: ubuntu-latest
+    needs: [validate, test-config, test-scripts]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make scripts executable
+        run: chmod +x tests/*.sh scripts/*.sh
+
+      - name: Run E2E scenarios
+        run: bash tests/run-scenarios.sh
