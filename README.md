@@ -6,6 +6,31 @@ A Claude Code plugin for session-based cross-model collaboration with OpenAI Cod
 
 ---
 
+## Why codex-collab? / 왜 이 플러그인인가?
+
+AI 코딩 어시스턴트를 하나만 쓰면 **단일 모델의 편향과 사각지대**에 갇힙니다. codex-collab은 Claude와 Codex(GPT-5.4), 두 AI 모델이 서로의 작업을 검증하고 토론하게 하여 이 문제를 해결합니다.
+
+Using a single AI coding assistant means being trapped in **one model's biases and blind spots**. codex-collab solves this by having Claude and Codex (GPT-5.4) verify each other's work and debate solutions.
+
+### 해결하는 문제 (Problems Solved)
+
+| 문제 | codex-collab의 해결 방식 |
+|------|------------------------|
+| **단일 모델 편향** — AI가 자신의 코드를 자신이 리뷰하면 같은 실수를 놓침 | `/codex-evaluate`: Codex가 코드를 평가하면 Claude가 독립 교차 검증 |
+| **설계 결정의 확신 부족** — "이 접근이 정말 최선인가?" | `/codex-debate`: 두 모델이 자동 토론 후 합의 또는 양측 입장을 제시 |
+| **앵커링 바이어스** — "Claude가 좋다고 했으니 Codex도 동의하겠지" | 앵커링 방지 프로토콜: Codex에게 Claude의 결론을 노출하지 않음 |
+| **검증 이력 부재** — 검증 결과가 휘발되어 추적 불가 | 세션 기반 이력 추적 + 리포트 자동 저장 |
+
+### 활용 시나리오 (Use Cases)
+
+- **코드 리뷰 강화**: PR 전에 `/codex-evaluate`로 두 모델의 교차 검증을 받아 리뷰 품질 향상
+- **아키텍처 결정**: `/codex-debate`로 "REST vs GraphQL" 같은 설계 결정에 두 모델의 독립적 의견 확보
+- **보안 검증**: 보안이 중요한 코드에 대해 크로스 모델 검증으로 취약점 발견 확률 증가
+- **학습/탐색**: `/codex-ask`로 같은 질문에 대한 두 모델의 다른 관점을 비교
+- **자동 품질 게이트**: 규칙 엔진으로 "confidence < 0.5이면 자동 재평가" 같은 자동화된 품질 관리
+
+---
+
 ## What's New in v2.1 / v2.1 변경사항
 
 - **세션 자동 생성**: `/debate`, `/evaluate`, `/ask` 실행 시 세션이 없으면 자동 생성 (v2.0에서는 수동 필수)
