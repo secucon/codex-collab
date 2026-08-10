@@ -27,15 +27,17 @@ async function cmdTurn(opts) {
 }
 
 async function cmdCheck(opts) {
+  let client;
   try {
-    const client = await CodexAppServerClient.connect(process.cwd(), serverOverride());
+    client = await CodexAppServerClient.connect(process.cwd(), serverOverride());
     const threadId = await client.startThread({ sandbox: "read-only" });
     const res = await client.runTurn(threadId, { prompt: "Reply with the single word: ready." });
-    await client.close();
     fs.writeFileSync(opts.out, JSON.stringify({ ok: true, sample: res.text }, null, 2));
   } catch (e) {
     fs.writeFileSync(opts.out, JSON.stringify({ ok: false, error: String(e.message ?? e) }, null, 2));
     process.exitCode = 1;
+  } finally {
+    if (client) await client.close();
   }
 }
 

@@ -43,3 +43,22 @@ test("check reports ok against a working server", async () => {
   const res = JSON.parse(fs.readFileSync(out, "utf8"));
   assert.equal(res.ok, true);
 });
+
+test("check closes the client and exits promptly on a server error", async () => {
+  const out = tmp("o.json");
+  let err;
+  try {
+    await run(process.execPath, [CLIENT, "check", "--out", out],
+      { env: fakeEnv({ FAKE_TURN_ERROR: "boom" }), timeout: 10000 });
+  } catch (e) { err = e; }
+  // With the bug (client never closed on the error path) the child stays alive,
+  // the parent event loop never empties, and execFile kills it after `timeout`
+  // → err.killed === true / SIGTERM. With the fix, close() runs in `finally`,
+  // the process exits 1 quickly → err.code === 1, not killed.
+  assert.ok(err, "check should exit non-zero on a server error");
+  assert.ok(!err.killed, `check must not be killed by timeout (it hung): signal=${err.signal}`);
+  assert.equal(err.code, 1, `expected exit code 1, got code=${err.code} killed=${err.killed} signal=${err.signal}`);
+  const res = JSON.parse(fs.readFileSync(out, "utf8"));
+  assert.equal(res.ok, false);
+  assert.match(res.error, /boom/);
+});
