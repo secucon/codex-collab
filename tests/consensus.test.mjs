@@ -28,6 +28,13 @@ test("consensus true only when BOTH sides agree", () => {
   assert.equal(r2.consensus, false);
 });
 
+test("consensus is false for either asymmetric disagreement", () => {
+  // Claude disagrees, Codex agrees -> NOT consensus (guards claude side)
+  assert.equal(evaluateConsensus(disagree, agree, { round: 1, defaultRounds: 3, maxExtra: 2 }).consensus, false);
+  // Claude agrees, Codex disagrees -> NOT consensus (guards codex side)
+  assert.equal(evaluateConsensus(agree, disagree, { round: 1, defaultRounds: 3, maxExtra: 2 }).consensus, false);
+});
+
 test("divergence is symmetric-difference size over key_points", () => {
   const r = evaluateConsensus(agree, disagree, { round: 1, defaultRounds: 3, maxExtra: 2 });
   // {a,b} vs {a,c,d} -> symmetric diff {b,c,d} = 3
