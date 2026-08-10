@@ -1,0 +1,19 @@
+{
+  "version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["stance", "reasoning", "key_points", "agrees_with_opponent"],
+  "properties": {
+    "stance": { "type": "string", "description": "one-line position on the topic this round" },
+    "reasoning": { "type": "string" },
+    "key_points": { "type": "array", "items": { "type": "string" }, "description": "atomic claims; used for divergence scoring" },
+    "agrees_with_opponent": { "type": "boolean", "description": "true only if you now accept the opponent's position" },
+    "proposed_change": {
+      "type": ["object", "null"],
+      "properties": {
+        "summary": { "type": "string" },
+        "files": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
