@@ -1,0 +1,30 @@
+name: codex-collab CI
+
+on:
+  push:
+    branches: [main, v3-clean]
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm test
+
+  drift-canary:
+    runs-on: ubuntu-latest
+    continue-on-error: true   # informational: red canary signals Codex drift, doesn't block merges of unrelated work
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Install real Codex CLI
+        run: npm install -g @openai/codex
+      - name: Handshake + read-only turn (auth may be absent; we assert the client speaks the protocol)
+        run: |
+          node scripts/codex-client.mjs check --out /tmp/check.json || true
+          cat /tmp/check.json
+          node -e "const r=require('/tmp/check.json'); if(!('ok' in r)) { console.error('canary: client did not produce a structured result'); process.exit(1); }"

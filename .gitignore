@@ -3,3 +3,4 @@
 .claude/*.local.md
 node_modules/
 /tmp/
+.codex-collab/
