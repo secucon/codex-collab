@@ -1,0 +1,9 @@
+codex-collab v3
+Copyright (c) jguru. MIT License.
+
+This project's codex app-server client is an independent implementation
+written against the publicly documented Codex app-server protocol
+(https://developers.openai.com/codex/app-server). It was informed by
+reference to openai/codex-plugin-cc (Apache-2.0). No source files were
+copied verbatim. Should any verbatim excerpt be introduced later, the
+Apache-2.0 attribution and license notice will be reproduced here.
