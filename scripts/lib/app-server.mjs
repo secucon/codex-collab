@@ -53,8 +53,10 @@ export class CodexAppServerClient {
   _handleLine(line) {
     if (!line.trim()) return;
     let msg;
+    // Skip non-JSON stdout lines (startup banners, warnings) instead of tearing
+    // the client down — a single such line must not break every turn.
     try { msg = JSON.parse(line); }
-    catch (e) { this._handleExit(new Error(`bad JSONL from app-server: ${e.message}`)); return; }
+    catch { return; }
     if (msg.id !== undefined && !msg.method) {
       const p = this.pending.get(msg.id);
       if (!p) return;

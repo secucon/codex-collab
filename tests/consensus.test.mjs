@@ -41,6 +41,35 @@ test("divergence is symmetric-difference size over key_points", () => {
   assert.equal(r.divergence, 3);
 });
 
+test("evaluateConsensus unwraps a codex-client wrapper on either side (Item A)", () => {
+  const claudeRaw = { agrees_with_opponent: true, key_points: ["a", "b"] };
+  // A codex-client WRAPPER: position fields live under `.structured`.
+  const codexWrapper = {
+    threadId: "t1",
+    text: "...",
+    structured: { agrees_with_opponent: true, key_points: ["a", "b"] },
+    status: "completed"
+  };
+  const r = evaluateConsensus(claudeRaw, codexWrapper, { round: 1, defaultRounds: 3, maxExtra: 2 });
+  // Old top-level read: codexWrapper.agrees_with_opponent === undefined -> consensus false.
+  // Unwrapped: structured.agrees_with_opponent === true on both sides -> consensus true.
+  assert.equal(r.consensus, true);
+  // Divergence must come from the STRUCTURED key_points {a,b} vs {a,b} = 0.
+  // If the codex side were treated as empty (old bug), divergence would be 2.
+  assert.equal(r.divergence, 0);
+
+  // Mirror: the claude side is unwrapped too.
+  const claudeWrapper = {
+    threadId: "t2",
+    text: "...",
+    structured: { agrees_with_opponent: true, key_points: ["a", "b"] },
+    status: "completed"
+  };
+  const r2 = evaluateConsensus(claudeWrapper, codexWrapper, { round: 1, defaultRounds: 3, maxExtra: 2 });
+  assert.equal(r2.consensus, true);
+  assert.equal(r2.divergence, 0);
+});
+
 test("cap is default + min(extra,2), clamped", () => {
   // round 5 with defaultRounds 3, maxExtra 2 => cap 5 => capReached true
   const r = evaluateConsensus(disagree, disagree, { round: 5, defaultRounds: 3, maxExtra: 2 });

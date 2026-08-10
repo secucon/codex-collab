@@ -5,12 +5,17 @@ import { parseArgs } from "./lib/args.mjs";
 export function evaluateConsensus(claudePos, codexPos, opts) {
   const { round, defaultRounds, maxExtra } = opts;
   const cap = defaultRounds + Math.max(0, Math.min(maxExtra ?? 0, 2));
-  const a = new Set(claudePos.key_points ?? []);
-  const b = new Set(codexPos.key_points ?? []);
+  // Tolerate both a raw position and a codex-client wrapper ({ threadId, text,
+  // structured, status }) — the position fields live under `.structured` in the
+  // wrapper, at the top level in a raw position.
+  const claude = claudePos.structured ?? claudePos;
+  const codex = codexPos.structured ?? codexPos;
+  const a = new Set(claude.key_points ?? []);
+  const b = new Set(codex.key_points ?? []);
   let divergence = 0;
   for (const p of a) if (!b.has(p)) divergence++;
   for (const p of b) if (!a.has(p)) divergence++;
-  const consensus = Boolean(claudePos.agrees_with_opponent) && Boolean(codexPos.agrees_with_opponent);
+  const consensus = Boolean(claude.agrees_with_opponent) && Boolean(codex.agrees_with_opponent);
   const capReached = round >= cap;
   const reason = consensus
     ? "both sides agree"

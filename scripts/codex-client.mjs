@@ -16,25 +16,42 @@ async function cmdTurn(opts) {
   if (sandbox !== "read-only" && sandbox !== "workspace-write") throw new Error(`invalid sandbox: ${sandbox}`);
   const prompt = fs.readFileSync(opts["prompt-file"], "utf8");
   const outputSchema = opts.schema ? JSON.parse(fs.readFileSync(opts.schema, "utf8")) : null;
-  const client = await CodexAppServerClient.connect(process.cwd(), serverOverride());
+  let client;
   try {
+    client = await CodexAppServerClient.connect(process.cwd(), serverOverride());
     const threadId = opts.resume
       ? await client.resumeThread(opts.resume, { sandbox })
       : await client.startThread({ sandbox });
     const res = await client.runTurn(threadId, { prompt, outputSchema });
     fs.writeFileSync(opts.out, JSON.stringify({ threadId, ...res }, null, 2));
-  } finally { await client.close(); }
+  } catch (e) {
+    // Write an error marker so a downstream reader (e.g. the orchestrator
+    // reusing this --out path) never mistakes a PRIOR round's file for this
+    // turn's result. Same shape as a success write, with status "error".
+    fs.writeFileSync(opts.out, JSON.stringify(
+      { threadId: null, text: "", structured: null, status: "error", error: String(e.message ?? e) }, null, 2));
+    process.exitCode = 1;
+  } finally {
+    if (client) await client.close();
+  }
 }
 
 async function cmdCheck(opts) {
   let client;
+  // Track how far the app-server handshake/turn got so the CI drift-canary can
+  // tell a real protocol/handshake break (never reached "initialized") from a
+  // mere turn-level auth failure (reached "initialized"/"thread-started").
+  let phase = "spawned";
   try {
     client = await CodexAppServerClient.connect(process.cwd(), serverOverride());
+    phase = "initialized";
     const threadId = await client.startThread({ sandbox: "read-only" });
+    phase = "thread-started";
     const res = await client.runTurn(threadId, { prompt: "Reply with the single word: ready." });
-    fs.writeFileSync(opts.out, JSON.stringify({ ok: true, sample: res.text }, null, 2));
+    phase = "turn-completed";
+    fs.writeFileSync(opts.out, JSON.stringify({ ok: true, phase, sample: res.text }, null, 2));
   } catch (e) {
-    fs.writeFileSync(opts.out, JSON.stringify({ ok: false, error: String(e.message ?? e) }, null, 2));
+    fs.writeFileSync(opts.out, JSON.stringify({ ok: false, phase, error: String(e.message ?? e) }, null, 2));
     process.exitCode = 1;
   } finally {
     if (client) await client.close();

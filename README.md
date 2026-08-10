@@ -26,4 +26,4 @@ Sandbox is enforced in code (`read-only` by default; `workspace-write` only on a
 
 ## Development
 
-`npm test` runs the unit suite (no Codex needed — a protocol fake is used). CI additionally runs a drift canary against the real Codex CLI so protocol changes surface as a failing build.
+`npm test` runs the unit suite (no Codex needed — a protocol fake is used). CI additionally runs a drift canary against the real Codex CLI: it detects client-liveness and app-server protocol/handshake drift (the `initialize` handshake needs no auth, so a broken handshake fails the build). Asserting a fully successful live turn additionally requires Codex auth in CI, so a turn-level auth failure is tolerated.

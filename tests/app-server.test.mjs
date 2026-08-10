@@ -52,6 +52,18 @@ test("child exit mid-turn rejects runTurn without an unhandled rejection", async
   assert.equal(unhandled, null, `unexpected unhandled rejection: ${unhandled}`);
 });
 
+test("a non-JSON stdout line (banner) is skipped, not fatal (Item D)", async () => {
+  // The fake prints `warning: something non-JSON` before any protocol message.
+  // Old code called _handleExit on the parse failure -> initialize rejected ->
+  // connect throws. With the fix the line is skipped and the turn completes.
+  const client = await connectFake({ FAKE_STDOUT_BANNER: "1", FAKE_TURN_TEXT: "still works" });
+  const threadId = await client.startThread({ sandbox: "read-only" });
+  const res = await client.runTurn(threadId, { prompt: "hi" });
+  assert.equal(res.text, "still works");
+  assert.equal(res.status, "completed");
+  await client.close();
+});
+
 test("structured output is parsed when text is valid JSON", async () => {
   const client = await connectFake({ FAKE_STRUCTURED: '{"stance":"yes"}' });
   const threadId = await client.startThread({ sandbox: "read-only" });

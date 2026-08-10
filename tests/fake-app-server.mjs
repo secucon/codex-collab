@@ -6,9 +6,14 @@
 //   FAKE_STRUCTURED  - if set (JSON string), echoed as final agentMessage text
 //   FAKE_EXIT_ON_TURN- if set, on turn/start the process exits WITHOUT a
 //                      response, simulating codex crashing mid-turn
+//   FAKE_STDOUT_BANNER- if set, print a non-JSON banner line to stdout BEFORE
+//                      any protocol message, simulating a real CLI warning/banner
 import readline from "node:readline";
 
 function send(obj) { process.stdout.write(JSON.stringify(obj) + "\n"); }
+
+// A stray non-JSON line on stdout must not break the protocol (skipped by the client).
+if (process.env.FAKE_STDOUT_BANNER) process.stdout.write("warning: something non-JSON\n");
 
 const rl = readline.createInterface({ input: process.stdin });
 let threadSeq = 0;
