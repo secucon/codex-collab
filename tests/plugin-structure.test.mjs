@@ -19,6 +19,7 @@ test("every command/agent references scripts via CLAUDE_PLUGIN_ROOT, never cwd-r
 
 test("plugin.json lists the three commands dir and the agent", () => {
   const p = JSON.parse(read("../.claude-plugin/plugin.json"));
+  const pkg = JSON.parse(read("../package.json"));
   assert.equal(p.name, "codex-collab");
-  assert.equal(p.version, "3.0.0");
+  assert.equal(p.version, pkg.version, "plugin.json and package.json versions must match");
 });

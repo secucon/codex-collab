@@ -1,6 +1,6 @@
 {
   "name": "codex-collab",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Claude Code <-> OpenAI Codex (GPT-5.x) cross-model collaboration — debate, cross-verify, ask via the codex app-server protocol",
   "author": { "name": "jguru" },
   "repository": "https://github.com/secucon/codex-collab",

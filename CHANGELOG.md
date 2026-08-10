@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.1 — 2026-08-10
+
+Hardening fast-follow: hang and stale-output protection.
+
+### Fixed
+- A hung app-server can no longer hang the client: JSON-RPC requests time out (default 30s), and an acknowledged turn times out without `turn/completed` (default 10 min). Override via `CODEX_COLLAB_REQUEST_TIMEOUT_MS` / `CODEX_COLLAB_TURN_TIMEOUT_MS`.
+- A failed handshake no longer leaks the spawned app-server process.
+- `turn`/`check` write a pending failure marker to `--out` before doing any work, so a killed process (e.g. a caller-side timeout) can never leave a previous run's result readable as fresh — closes the `/codex-ask` stale-answer window.
+- Local input errors (missing prompt file, invalid schema or sandbox) now write the error marker too, instead of leaving `--out` stale.
+
 ## 3.0.0 — 2026-08-10
 
 Clean rebuild on the `codex app-server` JSON-RPC protocol.

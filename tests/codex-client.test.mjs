@@ -87,6 +87,25 @@ test("turn writes an error marker to --out on turn failure and exits 1 (Item E)"
   assert.match(res.error, /boom/);
 });
 
+test("turn overwrites a stale --out with an error marker on a local input error", async () => {
+  const out = tmp("o.json");
+  // A PRIOR run's result sits at --out; the prompt file does not exist. Without
+  // the pending-marker-first write, the stale result survives and a downstream
+  // reader (e.g. /codex-ask) would present the old answer as this turn's.
+  fs.writeFileSync(out, JSON.stringify({ threadId: "STALE", text: "old answer", structured: { x: 1 }, status: "completed" }));
+  let err;
+  try {
+    await run(process.execPath, [CLIENT, "turn", "--sandbox", "read-only", "--prompt-file", "/nonexistent/prompt.txt", "--out", out],
+      { env: fakeEnv(), timeout: 10000 });
+  } catch (e) { err = e; }
+  assert.ok(err, "turn should exit non-zero when the prompt file is missing");
+  assert.equal(err.code, 1);
+  const res = JSON.parse(fs.readFileSync(out, "utf8"));
+  assert.equal(res.status, "error");
+  assert.equal(res.threadId, null);
+  assert.match(res.error, /ENOENT|prompt/i);
+});
+
 test("check closes the client and exits promptly on a server error", async () => {
   const out = tmp("o.json");
   let err;

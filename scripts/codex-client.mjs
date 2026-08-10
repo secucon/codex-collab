@@ -11,13 +11,22 @@ function serverOverride() {
   return { command, args };
 }
 
+function turnErrorMarker(error) {
+  return JSON.stringify({ threadId: null, text: "", structured: null, status: "error", error }, null, 2);
+}
+
 async function cmdTurn(opts) {
-  const sandbox = opts.sandbox ?? "read-only";
-  if (sandbox !== "read-only" && sandbox !== "workspace-write") throw new Error(`invalid sandbox: ${sandbox}`);
-  const prompt = fs.readFileSync(opts["prompt-file"], "utf8");
-  const outputSchema = opts.schema ? JSON.parse(fs.readFileSync(opts.schema, "utf8")) : null;
+  // Write a pending marker BEFORE doing anything else, so every death mode —
+  // local input error, crash, SIGKILL, or the caller's timeout killing us —
+  // leaves a truthful failure record at --out. A downstream reader must never
+  // find a prior run's result there. Overwritten on success or handled error.
+  fs.writeFileSync(opts.out, turnErrorMarker("turn did not complete: process was killed or crashed before a result was written"));
   let client;
   try {
+    const sandbox = opts.sandbox ?? "read-only";
+    if (sandbox !== "read-only" && sandbox !== "workspace-write") throw new Error(`invalid sandbox: ${sandbox}`);
+    const prompt = fs.readFileSync(opts["prompt-file"], "utf8");
+    const outputSchema = opts.schema ? JSON.parse(fs.readFileSync(opts.schema, "utf8")) : null;
     client = await CodexAppServerClient.connect(process.cwd(), serverOverride());
     const threadId = opts.resume
       ? await client.resumeThread(opts.resume, { sandbox })
@@ -25,11 +34,7 @@ async function cmdTurn(opts) {
     const res = await client.runTurn(threadId, { prompt, outputSchema });
     fs.writeFileSync(opts.out, JSON.stringify({ threadId, ...res }, null, 2));
   } catch (e) {
-    // Write an error marker so a downstream reader (e.g. the orchestrator
-    // reusing this --out path) never mistakes a PRIOR round's file for this
-    // turn's result. Same shape as a success write, with status "error".
-    fs.writeFileSync(opts.out, JSON.stringify(
-      { threadId: null, text: "", structured: null, status: "error", error: String(e.message ?? e) }, null, 2));
+    fs.writeFileSync(opts.out, turnErrorMarker(String(e.message ?? e)));
     process.exitCode = 1;
   } finally {
     if (client) await client.close();
@@ -42,6 +47,10 @@ async function cmdCheck(opts) {
   // tell a real protocol/handshake break (never reached "initialized") from a
   // mere turn-level auth failure (reached "initialized"/"thread-started").
   let phase = "spawned";
+  // Same pending-marker-first rule as cmdTurn: a killed check must not leave a
+  // prior check's result readable at --out.
+  fs.writeFileSync(opts.out, JSON.stringify(
+    { ok: false, phase: "not-started", error: "check did not complete: process was killed or crashed before a result was written" }, null, 2));
   try {
     client = await CodexAppServerClient.connect(process.cwd(), serverOverride());
     phase = "initialized";

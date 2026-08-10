@@ -8,6 +8,10 @@
 //                      response, simulating codex crashing mid-turn
 //   FAKE_STDOUT_BANNER- if set, print a non-JSON banner line to stdout BEFORE
 //                      any protocol message, simulating a real CLI warning/banner
+//   FAKE_NO_INIT_RESPONSE- if set, never answer `initialize`, simulating an
+//                      unresponsive/wedged app-server at handshake
+//   FAKE_HANG_TURN   - if set, ack turn/start but never send item/completed or
+//                      turn/completed, simulating a turn that hangs forever
 import readline from "node:readline";
 
 function send(obj) { process.stdout.write(JSON.stringify(obj) + "\n"); }
@@ -22,7 +26,10 @@ let turnSeq = 0;
 rl.on("line", (line) => {
   if (!line.trim()) return;
   const msg = JSON.parse(line);
-  if (msg.method === "initialize") return send({ id: msg.id, result: { } });
+  if (msg.method === "initialize") {
+    if (process.env.FAKE_NO_INIT_RESPONSE) return; // wedged at handshake
+    return send({ id: msg.id, result: { } });
+  }
   if (msg.method === "initialized") return;
   if (msg.method === "thread/start" || msg.method === "thread/resume") {
     const id = msg.params.threadId ?? `thread-${++threadSeq}`;
@@ -37,6 +44,7 @@ rl.on("line", (line) => {
     const turnId = `turn-${++turnSeq}`;
     send({ id: msg.id, result: { turn: { id: turnId } } });
     send({ method: "turn/started", params: { threadId, turn: { id: turnId } } });
+    if (process.env.FAKE_HANG_TURN) return; // acked, then silence forever
     if (process.env.FAKE_TURN_ERROR) {
       send({ method: "error", params: { error: { message: process.env.FAKE_TURN_ERROR } } });
       return;

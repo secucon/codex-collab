@@ -64,6 +64,27 @@ test("a non-JSON stdout line (banner) is skipped, not fatal (Item D)", async () 
   await client.close();
 });
 
+test("connect rejects when initialize never gets a response (request timeout)", async () => {
+  await assert.rejects(
+    CodexAppServerClient.connect(process.cwd(), {
+      command: process.execPath, args: [FAKE],
+      env: { ...process.env, FAKE_NO_INIT_RESPONSE: "1" },
+      requestTimeoutMs: 100
+    }),
+    /initialize timed out/
+  );
+});
+
+test("runTurn rejects when turn/completed never arrives (turn timeout)", async () => {
+  const client = await connectFake({ FAKE_HANG_TURN: "1" });
+  const threadId = await client.startThread({ sandbox: "read-only" });
+  await assert.rejects(
+    () => client.runTurn(threadId, { prompt: "x", turnTimeoutMs: 100 }),
+    /turn timed out/
+  );
+  await client.close();
+});
+
 test("structured output is parsed when text is valid JSON", async () => {
   const client = await connectFake({ FAKE_STRUCTURED: '{"stance":"yes"}' });
   const threadId = await client.startThread({ sandbox: "read-only" });

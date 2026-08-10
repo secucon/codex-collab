@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import readline from "node:readline";
 
-const CLIENT_INFO = { title: "codex-collab", name: "Claude Code", version: "3.0.0" };
+const CLIENT_INFO = { title: "codex-collab", name: "Claude Code", version: "3.0.1" };
 const CAPABILITIES = { experimentalApi: false, requestAttestation: false };
 
 export class CodexAppServerClient {
@@ -17,8 +17,9 @@ export class CodexAppServerClient {
     this.exitPromise = new Promise((r) => (this._resolveExit = r));
   }
 
-  static async connect(cwd, { command = "codex", args = ["app-server"], env } = {}) {
+  static async connect(cwd, { command = "codex", args = ["app-server"], env, requestTimeoutMs } = {}) {
     const client = new CodexAppServerClient(cwd);
+    client.requestTimeoutMs = requestTimeoutMs ?? Number(process.env.CODEX_COLLAB_REQUEST_TIMEOUT_MS ?? 30_000);
     client.proc = spawn(command, args, { cwd, env: env ?? process.env, stdio: ["pipe", "pipe", "pipe"] });
     client.proc.stdout.setEncoding("utf8");
     client.proc.stderr.setEncoding("utf8");
@@ -31,8 +32,15 @@ export class CodexAppServerClient {
     });
     client.rl = readline.createInterface({ input: client.proc.stdout });
     client.rl.on("line", (line) => client._handleLine(line));
-    await client._request("initialize", { clientInfo: CLIENT_INFO, capabilities: CAPABILITIES });
-    client._notify("initialized", {});
+    try {
+      await client._request("initialize", { clientInfo: CLIENT_INFO, capabilities: CAPABILITIES });
+      client._notify("initialized", {});
+    } catch (e) {
+      // A failed handshake must not leak the spawned process — the caller has
+      // no client handle to close.
+      await client.close().catch(() => {});
+      throw e;
+    }
     return client;
   }
 
@@ -43,8 +51,14 @@ export class CodexAppServerClient {
   _request(method, params) {
     if (this.closed) throw new Error("client closed");
     const id = this.nextId++;
+    const timeoutMs = this.requestTimeoutMs ?? 30_000;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject, method });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`${method} timed out after ${timeoutMs}ms (codex app-server unresponsive)`));
+      }, timeoutMs);
+      timer.unref?.();
+      this.pending.set(id, { resolve, reject, method, timer });
       this._send({ id, method, params });
     });
   }
@@ -61,6 +75,7 @@ export class CodexAppServerClient {
       const p = this.pending.get(msg.id);
       if (!p) return;
       this.pending.delete(msg.id);
+      clearTimeout(p.timer);
       if (msg.error) p.reject(new Error(msg.error.message ?? `${p.method} failed`));
       else p.resolve(msg.result ?? {});
       return;
@@ -86,7 +101,7 @@ export class CodexAppServerClient {
     if (this._exited) return;
     this._exited = true;
     this.exitError = err ?? null;
-    for (const p of this.pending.values()) p.reject(err ?? new Error("app-server closed"));
+    for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(err ?? new Error("app-server closed")); }
     this.pending.clear();
     if (this._turnWaiter) { const w = this._turnWaiter; this._turnWaiter = null; w.reject(err ?? new Error("app-server closed")); }
     this._resolveExit();
@@ -102,9 +117,11 @@ export class CodexAppServerClient {
     const res = await this._request("thread/resume", { threadId, cwd: this.cwd, model, approvalPolicy: "never", sandbox });
     return res.thread.id;
   }
-  async runTurn(threadId, { prompt, outputSchema = null, effort = null }) {
+  async runTurn(threadId, { prompt, outputSchema = null, effort = null, turnTimeoutMs = null }) {
     if (!prompt || !prompt.trim()) throw new Error("prompt required");
-    const done = new Promise((resolve, reject) => { this._turnWaiter = { resolve, reject, threadId, text: null }; });
+    const timeoutMs = turnTimeoutMs ?? Number(process.env.CODEX_COLLAB_TURN_TIMEOUT_MS ?? 600_000);
+    let w;
+    const done = new Promise((resolve, reject) => { w = this._turnWaiter = { resolve, reject, threadId, text: null }; });
     // Ensure a mid-flight rejection of `done` (e.g. the child exiting between
     // turn/start being sent and its response arriving) is always considered
     // handled. The real `await done` below still surfaces the rejection on the
@@ -118,7 +135,16 @@ export class CodexAppServerClient {
       this._turnWaiter = null;
       throw e;
     }
-    const result = await done;
+    // The turn was acked; from here the only completion signal is a
+    // turn/completed (or error) notification. Guard against it never arriving.
+    const timer = setTimeout(() => {
+      if (this._turnWaiter === w) this._turnWaiter = null;
+      w.reject(new Error(`turn timed out after ${timeoutMs}ms without turn/completed`));
+    }, timeoutMs);
+    timer.unref?.();
+    let result;
+    try { result = await done; }
+    finally { clearTimeout(timer); }
     let structured = null;
     if (outputSchema) { try { structured = JSON.parse(result.text); } catch { structured = null; } }
     return { text: result.text, structured, status: result.status };
