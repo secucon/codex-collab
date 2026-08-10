@@ -103,9 +103,19 @@ export class CodexAppServerClient {
   async runTurn(threadId, { prompt, outputSchema = null, effort = null }) {
     if (!prompt || !prompt.trim()) throw new Error("prompt required");
     const done = new Promise((resolve, reject) => { this._turnWaiter = { resolve, reject, threadId, text: null }; });
-    await this._request("turn/start", {
-      threadId, input: [{ type: "text", text: prompt, text_elements: [] }], model: null, effort, outputSchema
-    });
+    // Ensure a mid-flight rejection of `done` (e.g. the child exiting between
+    // turn/start being sent and its response arriving) is always considered
+    // handled. The real `await done` below still surfaces the rejection on the
+    // normal path; this only guards the window before we reach it.
+    done.catch(() => {});
+    try {
+      await this._request("turn/start", {
+        threadId, input: [{ type: "text", text: prompt, text_elements: [] }], model: null, effort, outputSchema
+      });
+    } catch (e) {
+      this._turnWaiter = null;
+      throw e;
+    }
     const result = await done;
     let structured = null;
     if (outputSchema) { try { structured = JSON.parse(result.text); } catch { structured = null; } }

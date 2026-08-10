@@ -4,6 +4,8 @@
 //   FAKE_TURN_TEXT   - text returned as the final agentMessage
 //   FAKE_TURN_ERROR  - if set, emit an `error` notification instead of completing
 //   FAKE_STRUCTURED  - if set (JSON string), echoed as final agentMessage text
+//   FAKE_EXIT_ON_TURN- if set, on turn/start the process exits WITHOUT a
+//                      response, simulating codex crashing mid-turn
 import readline from "node:readline";
 
 function send(obj) { process.stdout.write(JSON.stringify(obj) + "\n"); }
@@ -22,6 +24,10 @@ rl.on("line", (line) => {
     return send({ id: msg.id, result: { thread: { id } } });
   }
   if (msg.method === "turn/start") {
+    if (process.env.FAKE_EXIT_ON_TURN) {
+      // Crash mid-turn: exit WITHOUT sending the turn/start response.
+      process.exit(1);
+    }
     const threadId = msg.params.threadId;
     const turnId = `turn-${++turnSeq}`;
     send({ id: msg.id, result: { turn: { id: turnId } } });

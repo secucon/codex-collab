@@ -35,6 +35,23 @@ test("an error notification rejects the turn", async () => {
   await client.close();
 });
 
+test("child exit mid-turn rejects runTurn without an unhandled rejection", async () => {
+  let unhandled = null;
+  const guard = (reason) => { unhandled = reason; };
+  process.on("unhandledRejection", guard);
+  try {
+    const client = await connectFake({ FAKE_EXIT_ON_TURN: "1" });
+    const threadId = await client.startThread({ sandbox: "read-only" });
+    await assert.rejects(() => client.runTurn(threadId, { prompt: "x" }));
+    await client.close();
+    // Give any stray microtask/rejection a tick to surface before we check.
+    await new Promise((r) => setImmediate(r));
+  } finally {
+    process.off("unhandledRejection", guard);
+  }
+  assert.equal(unhandled, null, `unexpected unhandled rejection: ${unhandled}`);
+});
+
 test("structured output is parsed when text is valid JSON", async () => {
   const client = await connectFake({ FAKE_STRUCTURED: '{"stance":"yes"}' });
   const threadId = await client.startThread({ sandbox: "read-only" });
