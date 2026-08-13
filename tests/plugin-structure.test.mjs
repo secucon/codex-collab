@@ -23,3 +23,12 @@ test("plugin.json lists the three commands dir and the agent", () => {
   assert.equal(p.name, "codex-collab");
   assert.equal(p.version, pkg.version, "plugin.json and package.json versions must match");
 });
+
+test("marketplace.json versions match package.json", () => {
+  const m = JSON.parse(read("../.claude-plugin/marketplace.json"));
+  const pkg = JSON.parse(read("../package.json"));
+  assert.equal(m.metadata.version, pkg.version, "marketplace metadata version must match package.json");
+  for (const plugin of m.plugins) {
+    assert.equal(plugin.version, pkg.version, `marketplace plugin "${plugin.name}" version must match package.json`);
+  }
+});

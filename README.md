@@ -14,6 +14,17 @@ For everyday review/delegate/background work, use OpenAI's official plugin (`ope
 - Node.js >= 18.18
 - OpenAI Codex CLI (`npm install -g @openai/codex`, then `codex login`)
 
+## Install
+
+In Claude Code:
+
+```
+/plugin marketplace add secucon/codex-collab
+/plugin install codex-collab@codex-collab
+```
+
+Verify with `/plugin` — the three commands below should be listed. To install from a local checkout instead, use `/plugin marketplace add /path/to/codex-collab`.
+
 ## Commands
 
 - `/codex-ask <question>` — read-only question to Codex, optionally with Claude's take.
