@@ -16,7 +16,9 @@ All per-round temp files live under the gitignored `.codex-collab/tmp/debate/` d
 For each round `<n>` (substitute the actual round number for `<n>` everywhere below):
 
 1. Form YOUR position as JSON matching `${CLAUDE_PLUGIN_ROOT}/schemas/position.json` and save to `.codex-collab/tmp/debate/round-<n>-claude.json`. Round 1: form it blind (no Codex output yet).
-2. Build the Codex prompt in `.codex-collab/tmp/debate/round-<n>-codex-prompt.txt` containing ONLY: the topic, and Codex's OWN prior-round positions. NEVER include your reasoning or conclusions — this is the anti-anchoring rule, enforced by what you put in the file.
+2. Build the Codex prompt in `.codex-collab/tmp/debate/round-<n>-codex-prompt.txt`. What goes in it depends on the round — anti-anchoring protects round 1 only:
+   - **Round 1** — the topic ONLY. NEVER include your position, reasoning, or conclusions: both sides must form round 1 blind, and that is enforced by what you put in the file.
+   - **Rounds 2+** — the topic, Codex's OWN prior-round positions, AND your prior-round position (the `structured` object from `.codex-collab/tmp/debate/round-<n-1>-claude.json`, verbatim), clearly labelled as the opponent's position. Codex has no referent for `agrees_with_opponent` without it, and the consensus gate in step 4 requires BOTH sides to agree — so a debate whose Codex prompts never carry your position can never reach consensus and always runs to the round cap.
 3. Call Codex:
 
    ```bash
