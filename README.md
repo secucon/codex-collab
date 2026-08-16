@@ -27,9 +27,9 @@ Verify with `/plugin` — the three commands below should be listed. To install 
 
 ## Commands
 
-- `/codex-ask <question>` — read-only question to Codex, optionally with Claude's take.
-- `/codex-evaluate <target>` — Claude analyzes blind, Codex evaluates independently, then compares.
-- `/codex-debate <topic>` — N-round Claude<->Codex debate with deterministic consensus and an approval-gated apply step.
+- `/codex-collab:ask <question>` — read-only question to Codex, optionally with Claude's take.
+- `/codex-collab:evaluate <target>` — Claude analyzes blind, Codex evaluates independently, then compares.
+- `/codex-collab:debate <topic>` — N-round Claude<->Codex debate with deterministic consensus and an approval-gated apply step.
 
 ## Safety
 
