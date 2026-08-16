@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import { parseArgs } from "./lib/args.mjs";
 import { CodexAppServerClient } from "./lib/app-server.mjs";
+import { strictifySchema } from "./lib/schema.mjs";
 
 function serverOverride() {
   const command = process.env.CODEX_COLLAB_COMMAND;
@@ -26,7 +27,9 @@ async function cmdTurn(opts) {
     const sandbox = opts.sandbox ?? "read-only";
     if (sandbox !== "read-only" && sandbox !== "workspace-write") throw new Error(`invalid sandbox: ${sandbox}`);
     const prompt = fs.readFileSync(opts["prompt-file"], "utf8");
-    const outputSchema = opts.schema ? JSON.parse(fs.readFileSync(opts.schema, "utf8")) : null;
+    // The on-disk schemas are human-readable contracts; Codex structured-output
+    // STRICT mode accepts only a subset of JSON Schema, so normalize in memory.
+    const outputSchema = opts.schema ? strictifySchema(JSON.parse(fs.readFileSync(opts.schema, "utf8"))) : null;
     client = await CodexAppServerClient.connect(process.cwd(), serverOverride());
     const threadId = opts.resume
       ? await client.resumeThread(opts.resume, { sandbox })

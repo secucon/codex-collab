@@ -37,6 +37,24 @@ test("turn with --schema parses structured output", async () => {
   assert.deepEqual(res.structured, { stance: "yes" });
 });
 
+test("turn normalizes the schema for STRICT mode before sending it to Codex", async () => {
+  // Real Codex rejects our on-disk schemas with 400 invalid_json_schema; the
+  // client must hand the app-server a normalized copy, not the raw file.
+  const promptFile = tmp("p.txt"); fs.writeFileSync(promptFile, "hi");
+  const schema = tmp("s.json");
+  fs.writeFileSync(schema, JSON.stringify({
+    version: "3.0.0", type: "object", additionalProperties: false, required: ["a"],
+    properties: { a: { type: "string" }, b: { type: "number", minimum: 0 } },
+  }));
+  const out = tmp("o.json");
+  await run(process.execPath, [CLIENT, "turn", "--sandbox", "read-only", "--prompt-file", promptFile, "--schema", schema, "--out", out],
+    { env: fakeEnv({ FAKE_ECHO_SCHEMA: "1" }) });
+  const sent = JSON.parse(fs.readFileSync(out, "utf8")).structured;
+  assert.ok(!("version" in sent), "non-standard version keyword must be dropped");
+  assert.deepEqual(sent.required, ["a", "b"], "every property key must be required");
+  assert.deepEqual(sent.properties.b, { type: ["number", "null"], minimum: 0 }, "optional prop nullable, range constraint preserved");
+});
+
 test("check reports ok against a working server", async () => {
   const out = tmp("o.json");
   await run(process.execPath, [CLIENT, "check", "--out", out], { env: fakeEnv() });

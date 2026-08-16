@@ -1,5 +1,10 @@
 # Manual check: thread/resume across separate app-server spawns (spec R1)
 
+> **Outcome — 2026-08-16: PASS** (codex-cli 0.147.0, ChatGPT auth). A brand-new
+> app-server process resumed a prior process's thread and recalled the secret
+> word. The stateless-per-round design stands as-is; the transcript-passing
+> fallback below was NOT applied.
+
 This validates the load-bearing assumption behind the v3 stateless-per-round
 design: that a **fresh** `codex app-server` process can `thread/resume` a thread
 started by a **prior**, already-exited process. If it can, debate continuity

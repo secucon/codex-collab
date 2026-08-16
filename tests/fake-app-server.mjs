@@ -4,6 +4,9 @@
 //   FAKE_TURN_TEXT   - text returned as the final agentMessage
 //   FAKE_TURN_ERROR  - if set, emit an `error` notification instead of completing
 //   FAKE_STRUCTURED  - if set (JSON string), echoed as final agentMessage text
+//   FAKE_ECHO_SCHEMA - if set, the final agentMessage text is the turn/start
+//                      `outputSchema` param exactly as received, so a test can
+//                      assert what the client actually sent to Codex
 //   FAKE_EXIT_ON_TURN- if set, on turn/start the process exits WITHOUT a
 //                      response, simulating codex crashing mid-turn
 //   FAKE_STDOUT_BANNER- if set, print a non-JSON banner line to stdout BEFORE
@@ -49,7 +52,8 @@ rl.on("line", (line) => {
       send({ method: "error", params: { error: { message: process.env.FAKE_TURN_ERROR } } });
       return;
     }
-    const text = process.env.FAKE_STRUCTURED ?? process.env.FAKE_TURN_TEXT ?? "ok";
+    const text = process.env.FAKE_ECHO_SCHEMA ? JSON.stringify(msg.params.outputSchema)
+      : process.env.FAKE_STRUCTURED ?? process.env.FAKE_TURN_TEXT ?? "ok";
     send({ method: "item/completed", params: { threadId, item: { type: "agentMessage", phase: "final_answer", text } } });
     send({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "completed" } } });
     return;

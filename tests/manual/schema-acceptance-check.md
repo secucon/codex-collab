@@ -1,5 +1,19 @@
 # Manual check: Codex structured-output STRICT mode accepts our schemas
 
+> **Outcome — 2026-08-16: both checks FAILED, fallback applied** (codex-cli
+> 0.147.0, ChatGPT auth). The API returned `400 invalid_json_schema` for both
+> schemas:
+> - position: `('properties','proposed_change','type','0')` — `additionalProperties`
+>   must be supplied and false.
+> - evaluation: `('properties','findings','items')` — `required` must include every
+>   key in `properties`; missing `location`.
+>
+> Hypotheses 1 and 2 below were therefore CONFIRMED; **hypothesis 3 was WRONG** —
+> a STRICT-clean schema keeping `minimum`/`maximum` was accepted, so numeric range
+> keywords are preserved rather than stripped. The normalizer now lives in
+> `scripts/lib/schema.mjs` (`strictifySchema`), called from `cmdTurn`; on-disk
+> schemas are untouched. Re-running both checks after the fix: PASS / PASS.
+
 This is the second real-Codex manual check (companion to
 [`resume-check.md`](./resume-check.md)). It verifies that the JSON schemas we
 hand to Codex via `--schema` are actually accepted by Codex/OpenAI

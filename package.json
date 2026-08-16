@@ -1,6 +1,6 @@
 {
   "name": "codex-collab",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "private": true,
   "description": "Claude Code <-> OpenAI Codex cross-model collaboration: debate, cross-verify, ask — on the codex app-server protocol",
   "type": "module",

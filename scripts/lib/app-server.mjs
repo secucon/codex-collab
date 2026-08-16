@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import readline from "node:readline";
 
-const CLIENT_INFO = { title: "codex-collab", name: "Claude Code", version: "3.0.1" };
+const CLIENT_INFO = { title: "codex-collab", name: "Claude Code", version: "3.0.2" };
 const CAPABILITIES = { experimentalApi: false, requestAttestation: false };
 
 export class CodexAppServerClient {
