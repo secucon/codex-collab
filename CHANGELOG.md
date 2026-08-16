@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.1.0 — 2026-08-16
+
+### Changed (BREAKING — command names)
+- The three commands dropped the redundant `codex-` prefix, since the plugin
+  name already namespaces them. `/codex-collab:codex-ask` was saying "codex"
+  twice.
+
+  | before | after |
+  | --- | --- |
+  | `/codex-collab:codex-ask` | `/codex-collab:ask` |
+  | `/codex-collab:codex-evaluate` | `/codex-collab:evaluate` |
+  | `/codex-collab:codex-debate` | `/codex-collab:debate` |
+
+  Only the file names and the prose that names them changed; no script,
+  schema, or protocol behaviour is affected. Versioned as a minor bump rather
+  than a major one because the v3 architecture is untouched — the break is
+  limited to what a user types.
+
 ## 3.0.2 — 2026-08-16
 
 First validation against a real, authenticated `codex` (CLI 0.147.0). Both

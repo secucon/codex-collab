@@ -1,6 +1,8 @@
 .DS_Store
 *.log
 .claude/*.local.md
+CLAUDE.local.md
 node_modules/
 /tmp/
 .codex-collab/
+docs/

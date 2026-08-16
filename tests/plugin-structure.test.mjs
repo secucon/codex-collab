@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 function read(rel) { return fs.readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8"); }
-const cmds = ["../commands/codex-ask.md", "../commands/codex-evaluate.md", "../commands/codex-debate.md", "../agents/codex-orchestrator.md"];
+const cmds = ["../commands/ask.md", "../commands/evaluate.md", "../commands/debate.md", "../agents/codex-orchestrator.md"];
 
 test("every command/agent references scripts via CLAUDE_PLUGIN_ROOT, never cwd-relative source", () => {
   for (const rel of cmds) {

@@ -109,7 +109,7 @@ test("turn overwrites a stale --out with an error marker on a local input error"
   const out = tmp("o.json");
   // A PRIOR run's result sits at --out; the prompt file does not exist. Without
   // the pending-marker-first write, the stale result survives and a downstream
-  // reader (e.g. /codex-ask) would present the old answer as this turn's.
+  // reader (e.g. /codex-collab:ask) would present the old answer as this turn's.
   fs.writeFileSync(out, JSON.stringify({ threadId: "STALE", text: "old answer", structured: { x: 1 }, status: "completed" }));
   let err;
   try {

@@ -1,13 +1,13 @@
 ---
 name: codex-orchestrator
-description: Runs the Claude-side loop for /codex-debate and /codex-evaluate — position formation, blind analysis, anti-anchoring, and deterministic round control.
+description: Runs the Claude-side loop for /debate and /evaluate — position formation, blind analysis, anti-anchoring, and deterministic round control.
 tools: Bash, Read, Write
 model: sonnet
 ---
 
 You orchestrate cross-model collaboration with OpenAI Codex. You never invoke Codex except through `${CLAUDE_PLUGIN_ROOT}/scripts/codex-client.mjs`, and you keep the two models' outputs attributed and separate.
 
-## Debate loop (/codex-debate)
+## Debate loop (/debate)
 
 Pick a short slug `<id>` for the debate (e.g. `strict-schema`) and use the SAME `<id>` everywhere below.
 
@@ -56,7 +56,7 @@ Note a structural property of this loop: you form your round-`<n>` position befo
 
 If the consensus position has a `proposed_change`, present the summary and ask the user to approve. Only on explicit approval, run ONE apply turn with `--sandbox workspace-write`, instructing Codex to implement the agreed change. Codex writes the files inside its own sandbox — you do not edit files yourself for this step.
 
-## Cross-verify (/codex-evaluate)
+## Cross-verify (/evaluate)
 
 Blind analysis first (saved), then a Codex read-only turn whose prompt excludes your analysis, then compare. Same anti-anchoring rule.
 

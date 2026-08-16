@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Claude Code <-> OpenAI Codex (GPT-5.x) cross-model collaboration — debate, cross-verify, ask via the codex app-server protocol",
-    "version": "3.0.2"
+    "version": "3.1.0"
   },
   "plugins": [
     {
       "name": "codex-collab",
       "source": "./",
       "description": "Claude Code <-> OpenAI Codex (GPT-5.x) cross-model collaboration — debate, cross-verify, ask via the codex app-server protocol",
-      "version": "3.0.2",
+      "version": "3.1.0",
       "keywords": ["codex", "openai", "collaboration", "cross-model", "debate", "evaluate", "app-server"]
     }
   ]
