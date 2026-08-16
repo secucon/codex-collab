@@ -35,6 +35,10 @@ Verify with `/plugin` — the three commands below should be listed. To install 
 
 Sandbox is enforced in code (`read-only` by default; `workspace-write` only on an approved apply turn). No dangerous flags are ever constructed (enforced by a test). Codex performs all file writes inside its own sandbox.
 
+Verified live on 2026-08-16 against a real Codex: under `read-only` a write request is refused and no file is created; under `workspace-write` a write inside the working directory succeeds while a write to a path outside it is refused. Note that Codex's `workspace-write` policy also permits writes to `/tmp` and `$TMPDIR` — that is Codex's own sandbox definition, not just the working directory, so do not treat "workspace-write" as "cwd only".
+
+The consensus gate refuses to score a turn that failed: a `status: "error"` or missing `structured` on either side exits non-zero and writes a stop marker, so a crashed Codex turn cannot silently become a debate round.
+
 ## Development
 
 `npm test` runs the unit suite (no Codex needed — a protocol fake is used).

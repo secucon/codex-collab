@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 3.0.2 — 2026-08-16
 
 First validation against a real, authenticated `codex` (CLI 0.147.0). Both
-manual checks parked in `tests/manual/` since 3.0.0 have now been run.
+manual checks parked in `tests/manual/` since 3.0.0 have now been run, and the
+paths they could not reach were exercised live.
 
 ### Fixed
 - **Structured output was broken against real Codex.** Both `schemas/position.json`
@@ -21,6 +22,52 @@ manual checks parked in `tests/manual/` since 3.0.0 have now been run.
   rounds 2+ carry the opponent's prior position verbatim. Verified live: the same
   round-2 positions score `consensus: false` under the old prompt shape and
   `consensus: true` under the new one.
+- **The consensus gate scored failed turns.** A codex-client error marker
+  (`status: "error"`, `structured: null`) fed to `consensus.mjs` produced an
+  ordinary `"divergence N, continue"` verdict and exit 0, so a crashed Codex turn
+  could silently become a debate round — the only guard was the orchestrator
+  remembering to check. `evaluateConsensus` now refuses an unusable position on
+  either side, and the CLI writes a pending marker before doing any work, exits 1,
+  and leaves a `capReached: true` stop marker so an unscoreable round halts the
+  loop instead of spinning.
+- `strictifySchema` now traverses `anyOf`/`oneOf`/`prefixItems` and
+  `$defs`/`definitions`, closes object nodes that declare no `properties`,
+  normalizes `required` to exactly the property keys (dropping duplicates and
+  entries with no matching property), and can express nullability for `$ref`,
+  `anyOf`/`oneOf` and untyped `enum` properties — all of which previously became
+  required-but-not-nullable.
+- **`strictifySchema` refuses what it cannot normalize instead of silently
+  changing it.** Its two rewrites — closing an object and promoting optional
+  properties to required-but-nullable — preserve meaning only in plain
+  `properties`/`items`/union positions. Inside an applicator they change what the
+  schema *matches*: closing every `allOf` branch makes an intersection of
+  differing branches unsatisfiable, and forcing `required` inside an `if` inverts
+  the condition for an absent key. So `allOf`, `not`, `if`/`then`/`else`,
+  `contains`, `propertyNames`, `patternProperties`, `dependentSchemas`,
+  `dependencies`, `unevaluated*`, `additionalItems` and `contentSchema` now throw
+  with the offending path, as does a schema-valued `additionalProperties` (which
+  was previously overwritten with `false`, narrowing "any string-valued key" to
+  "no keys at all") and an optional property with no `type`/`$ref`/`anyOf`/`enum`
+  to widen (which previously became required AND non-nullable).
+- **The debate spec depended on shell state that does not survive a Bash call.**
+  `agents/codex-orchestrator.md` used `${codex_thread_id:+--resume "$codex_thread_id"}`
+  and `--round "$round"`, neither of which any step ever assigned. Pasted verbatim
+  they expand to nothing, so `--resume` silently vanished and every round started a
+  fresh Codex thread — no error, no continuity. All snippets now use literal values,
+  the thread id is read from the previous round's `-codex.json`, and a test fails the
+  build if any command/agent bash snippet references a variable other than
+  `CLAUDE_PLUGIN_ROOT`.
+- Other debate-spec defects, found by running the loop end to end with a real agent:
+  round-2+ prompts pointed at a `structured` key that a Claude position file never
+  has (only Codex output files are wrapped); per-round temp paths carried the round
+  number but not the debate id, so a second debate overwrote the first one's
+  artifacts; the state file's shape was declared but no step wrote it; the reports
+  directory was never created and the report filename was unspecified; and "the
+  topic ONLY" for round 1 forbade even a neutral instruction. All are now specified.
+- Documented in the spec: both sides answer `agrees_with_opponent` against the
+  opponent's *previous* position, so mutual agreement becomes visible to the gate one
+  round after it actually occurs — and `divergence` can rise while the two sides
+  converge, so it must not be presented as a convergence metric.
 
 ### Verified against real Codex (2026-08-16)
 - `thread/resume` **does** resume a thread across separate app-server processes
@@ -29,11 +76,20 @@ manual checks parked in `tests/manual/` since 3.0.0 have now been run.
 - STRICT mode **accepts** `minimum`/`maximum` — the third hypothesis in
   `tests/manual/schema-acceptance-check.md` was wrong. Numeric range keywords are
   deliberately preserved so `evaluation.confidence` keeps its 0..1 contract.
+- A schema exercising `$defs` + `$ref`, an `anyOf` union, an untyped `enum`, an
+  object with no `properties` and a `minimum`/`maximum` range is **accepted** after
+  normalization and **rejected** before it (`400 invalid_json_schema`), so the
+  normalizer is load-bearing rather than decorative.
+- The apply gate behaves as documented: under `workspace-write` a write inside the
+  working directory succeeds and a write outside it is refused; under `read-only`
+  no file is created. Codex's `workspace-write` policy does also permit `/tmp` and
+  `$TMPDIR` — see the Safety section of the README.
 
 ### Known limitations
-- `strictifySchema` traverses only inline `properties` and `items`. Schemas using
-  `anyOf`/`oneOf`/`allOf`/`$defs`/`$ref`, or an object node with no `properties`,
-  are not normalized. Neither shipped schema uses them.
+- `$ref` targets are never resolved or inlined. A local `$ref` is normalized only
+  because `$defs`/`definitions` are traversed in their own right; a ref pointing
+  outside the document is left untouched. Traversing a keyword also does not make
+  STRICT mode *support* it.
 - `consensus.mjs` reports `divergence` as an exact-string set difference over
   free-text `key_points`, so it is very nearly always `|a| + |b|` and carries no
   usable signal. It is informational only — it does not gate the loop.
