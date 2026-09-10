@@ -1,5 +1,45 @@
 # Changelog
 
+## 3.1.1 — 2026-09-10
+
+### Fixed
+- Consensus requires both models to explicitly accept the SHA-256 of the same
+  candidate proposal. Votes on previous opposing positions no longer establish
+  consensus when the models swap positions. Position schema 3.1.1 adds required
+  `accepted_proposal_id` (null for rejection or a blind round). Old boolean-only
+  positions cannot establish consensus; start a fresh debate after upgrading.
+- Only completed turns succeed. Interrupted/failed turns and invalid structured
+  JSON become error results; bundled position/evaluation outputs also receive
+  local domain validation. Check no longer reports interrupted turns as healthy.
+- Completed position outputs with malformed, inconsistent or stale proposal
+  votes count as non-acceptance with warnings and preserved original votes.
+  Analysis-body and transport failures still stop the run; a voting typo does not.
+- Match notifications by thread and turn, preserve final answers over commentary,
+  tolerate retryable errors, and answer server requests with declines or explicit
+  unsupported-method errors. Reject overlapping turns on one client.
+- Bound shutdown with SIGTERM then SIGKILL, interrupt timed-out turns, cap retained
+  stderr, and validate timeouts and round-limit numbers.
+- Give every command a UUID run directory. Debate rounds use an exclusive lock
+  and atomically save state before stopping, including the terminal round.
+- CI distinguishes explicit authentication failures from protocol errors; a pinned
+  0.154.0 canary is required and latest-CLI drift remains advisory. Unit matrix
+  covers Node 18, 20, 22 and 24.
+- Recognize the real CLI's explicit missing-credentials 401 message with URL and
+  request metadata even when `codexErrorInfo` is `other`; unrelated errors remain
+  failures.
+
+### Changed
+- Node now builds debate prompts, resumes threads, scores and records rounds,
+  and enforces the five-round cap via `scripts/workflow.mjs`.
+- Resumed debate prompts omit Codex's already-persisted prior responses.
+- CLI accepts `--model`, `--effort`, and `--run-id`; results include phase timings,
+  prompt bytes, turn ID and server-reported token usage (null when unavailable).
+- Runs and reports live under `.codex-collab/runs/<runId>/`. Persistent connections
+  and parallel model evaluation remain deferred until latency is measured.
+- Added an opt-in authenticated two-round check (deterministic Claude-side
+  fixture). Passed on Codex 0.154.0 on 2026-09-10: structured output, same-thread
+  resume and shared-proposal consensus, with observed protocol field shapes.
+
 ## 3.1.0 — 2026-08-16
 
 ### Changed (BREAKING — command names)

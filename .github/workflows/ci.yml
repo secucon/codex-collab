@@ -8,26 +8,37 @@ on:
 jobs:
   unit:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20, 22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "${{ matrix.node }}" }
       - run: npm test
 
   drift-canary:
     runs-on: ubuntu-latest
-    continue-on-error: true   # informational: red canary signals Codex drift, doesn't block merges of unrelated work
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        include:
+          - codex: "0.154.0"
+            experimental: false
+          - codex: "latest"
+            experimental: true
+    continue-on-error: ${{ matrix.experimental }}
+    env:
+      CODEX_COLLAB_REQUEST_TIMEOUT_MS: "30000"
+      CODEX_COLLAB_TURN_TIMEOUT_MS: "45000"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
       - name: Install real Codex CLI
-        run: npm install -g @openai/codex
+        run: npm install -g @openai/codex@${{ matrix.codex }}
       - name: Handshake + read-only turn (auth may be absent; we assert the client speaks the protocol)
         run: |
           node scripts/codex-client.mjs check --out /tmp/check.json || true
           cat /tmp/check.json
-          # `initialize` does not require auth, so failing to reach "initialized" signals a
-          # real protocol/handshake break (canary goes red). A turn-level auth failure
-          # (phase "initialized"/"thread-started", ok:false) is tolerated and passes.
-          node -e "const r=require('/tmp/check.json'); const ok=['initialized','thread-started','turn-completed'].includes(r.phase); if(!ok){console.error('canary: handshake not reached, phase='+r.phase); process.exit(1);} console.log('canary phase='+r.phase+' ok='+r.ok);"
+          node scripts/check-canary.mjs /tmp/check.json

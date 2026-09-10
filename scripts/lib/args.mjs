@@ -11,7 +11,7 @@ export function parseArgs(argv, spec) {
       out[name] = true;
     } else if (values.has(name)) {
       const val = argv[++i];
-      if (val === undefined) throw new Error(`missing value for --${name}`);
+      if (val === undefined || val.startsWith("--")) throw new Error(`missing value for --${name}`);
       out[name] = val;
     } else {
       throw new Error(`unknown option: --${name}`);

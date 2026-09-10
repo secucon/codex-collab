@@ -1,15 +1,18 @@
 {
-  "version": "3.0.0",
+  "version": "3.1.1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["stance", "reasoning", "key_points", "agrees_with_opponent"],
+  "required": ["stance", "reasoning", "key_points", "agrees_with_opponent", "accepted_proposal_id"],
   "properties": {
     "stance": { "type": "string", "description": "one-line position on the topic this round" },
     "reasoning": { "type": "string" },
     "key_points": { "type": "array", "items": { "type": "string" }, "description": "atomic claims; used for divergence scoring" },
-    "agrees_with_opponent": { "type": "boolean", "description": "true only if you now accept the opponent's position" },
+    "agrees_with_opponent": { "type": "boolean", "description": "true only if you accept the complete supplied candidate proposal; false in the blind first round" },
+    "accepted_proposal_id": { "type": ["string", "null"], "description": "Copy the supplied candidate's SHA-256 id only when you accept its complete contents without amendments; otherwise null. Never invent an id." },
     "proposed_change": {
       "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["summary", "files"],
       "properties": {
         "summary": { "type": "string" },
         "files": { "type": "array", "items": { "type": "string" } }

@@ -92,3 +92,69 @@ test("structured output is parsed when text is valid JSON", async () => {
   assert.deepEqual(res.structured, { stance: "yes" });
   await client.close();
 });
+
+for (const status of ["interrupted", "failed", "inProgress"]) {
+  test(`non-success terminal status ${status} rejects`, async () => {
+    const c = await connectFake({ FAKE_STATUS: status });
+    try {
+      const id = await c.startThread();
+      await assert.rejects(c.runTurn(id, { prompt: "x" }), new RegExp(status));
+    } finally { await c.close(); }
+  });
+}
+
+test("unrelated events, retryable errors and commentary do not finish or overwrite a turn", async () => {
+  const c = await connectFake({ FAKE_UNRELATED: "1", FAKE_RETRY_ERROR: "1", FAKE_COMMENTARY: "1" });
+  try {
+    const id = await c.startThread();
+    const r = await c.runTurn(id, { prompt: "x" });
+    assert.equal(r.text, "ok");
+    assert.equal(r.tokenUsage.total.totalTokens, 123);
+    assert.equal(r.turnId, "turn-1");
+  } finally { await c.close(); }
+});
+
+for (const [method, expected] of [
+  ["mcpServer/elicitation/request", { action: "decline", content: null }],
+  ["item/commandExecution/requestApproval", { decision: "decline" }],
+  ["item/fileChange/requestApproval", { decision: "decline" }],
+  ["item/permissions/requestApproval", { permissions: {}, scope: "turn" }],
+  ["unknown/request", null],
+]) {
+  test(`server request ${method} receives a response`, async () => {
+    const c = await connectFake({ FAKE_SERVER_REQUEST: method });
+    try {
+      const id = await c.startThread();
+      const r = JSON.parse((await c.runTurn(id, { prompt: "x", turnTimeoutMs: 1000 })).text);
+      if (expected) assert.deepEqual(r.result, expected);
+      else assert.equal(r.error.code, -32601);
+    } finally { await c.close(); }
+  });
+}
+
+test("close force-kills a server that ignores EOF and SIGTERM", async () => {
+  const c = await connectFake({ FAKE_IGNORE_TERM: "1" });
+  const start = performance.now();
+  await c.close();
+  assert.equal(c.proc.signalCode, "SIGKILL");
+  assert.ok(performance.now() - start < 4000);
+});
+
+test("malformed structured JSON rejects", async () => {
+  const c = await connectFake({ FAKE_TURN_TEXT: "not JSON" });
+  try {
+    const id = await c.startThread();
+    await assert.rejects(c.runTurn(id, { prompt: "x", outputSchema: {} }), /not valid JSON/);
+  } finally { await c.close(); }
+});
+
+test("overlapping turns are rejected without replacing the active waiter", async () => {
+  const c = await connectFake({ FAKE_HANG_TURN: "1" });
+  try {
+    const id = await c.startThread();
+    const first = c.runTurn(id, { prompt: "x", turnTimeoutMs: 100 });
+    const rejection = assert.rejects(first, /timed out/);
+    await assert.rejects(c.runTurn(id, { prompt: "second" }), /already running/);
+    await rejection;
+  } finally { await c.close(); }
+});

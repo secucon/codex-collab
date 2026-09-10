@@ -3,6 +3,8 @@ import fs from "node:fs";
 import { parseArgs } from "./lib/args.mjs";
 import { CodexAppServerClient } from "./lib/app-server.mjs";
 import { strictifySchema } from "./lib/schema.mjs";
+import { validatePosition, validateEvaluation } from "./lib/contracts.mjs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 function serverOverride() {
   const command = process.env.CODEX_COLLAB_COMMAND;
@@ -12,17 +14,18 @@ function serverOverride() {
   return { command, args };
 }
 
-function turnErrorMarker(error) {
-  return JSON.stringify({ threadId: null, text: "", structured: null, status: "error", error }, null, 2);
+function turnErrorMarker(error, runId = null) {
+  return JSON.stringify({ runId, threadId: null, text: "", structured: null, status: "error", error }, null, 2);
 }
 
-async function cmdTurn(opts) {
+export async function cmdTurn(opts) {
   // Write a pending marker BEFORE doing anything else, so every death mode —
   // local input error, crash, SIGKILL, or the caller's timeout killing us —
   // leaves a truthful failure record at --out. A downstream reader must never
   // find a prior run's result there. Overwritten on success or handled error.
-  fs.writeFileSync(opts.out, turnErrorMarker("turn did not complete: process was killed or crashed before a result was written"));
+  fs.writeFileSync(opts.out, turnErrorMarker("turn did not complete: process was killed or crashed before a result was written", opts["run-id"]));
   let client;
+  const started = performance.now();
   try {
     const sandbox = opts.sandbox ?? "read-only";
     if (sandbox !== "read-only" && sandbox !== "workspace-write") throw new Error(`invalid sandbox: ${sandbox}`);
@@ -31,14 +34,28 @@ async function cmdTurn(opts) {
     // STRICT mode accepts only a subset of JSON Schema, so normalize in memory.
     const outputSchema = opts.schema ? strictifySchema(JSON.parse(fs.readFileSync(opts.schema, "utf8"))) : null;
     client = await CodexAppServerClient.connect(process.cwd(), serverOverride());
+    const connected = performance.now();
     const threadId = opts.resume
-      ? await client.resumeThread(opts.resume, { sandbox })
-      : await client.startThread({ sandbox });
-    const res = await client.runTurn(threadId, { prompt, outputSchema });
-    fs.writeFileSync(opts.out, JSON.stringify({ threadId, ...res }, null, 2));
+      ? await client.resumeThread(opts.resume, { sandbox, model: opts.model ?? null })
+      : await client.startThread({ sandbox, model: opts.model ?? null });
+    const ready = performance.now();
+    const res = await client.runTurn(threadId, { prompt, outputSchema, effort: opts.effort ?? null });
+    if (opts.schema) {
+      const schemaPath = fs.realpathSync(opts.schema);
+      // Vote consistency requires this round's candidate, which the workflow
+      // owns. Preserve raw votes here so it can record and normalize slips.
+      if (schemaPath === fileURLToPath(new URL("../schemas/position.json", import.meta.url))) validatePosition(res.structured, { validateVote: false });
+      if (schemaPath === fileURLToPath(new URL("../schemas/evaluation.json", import.meta.url))) validateEvaluation(res.structured);
+    }
+    const result = { runId: opts["run-id"] ?? null, threadId, ...res, metrics: {
+      connectMs: connected - started, threadMs: ready - connected, turnMs: performance.now() - ready,
+      totalMs: performance.now() - started, promptBytes: Buffer.byteLength(prompt), model: opts.model ?? null, effort: opts.effort ?? null,
+    } };
+    fs.writeFileSync(opts.out, JSON.stringify(result, null, 2));
+    return result;
   } catch (e) {
-    fs.writeFileSync(opts.out, turnErrorMarker(String(e.message ?? e)));
-    process.exitCode = 1;
+    fs.writeFileSync(opts.out, turnErrorMarker(String(e.message ?? e), opts["run-id"]));
+    throw e;
   } finally {
     if (client) await client.close();
   }
@@ -63,7 +80,7 @@ async function cmdCheck(opts) {
     phase = "turn-completed";
     fs.writeFileSync(opts.out, JSON.stringify({ ok: true, phase, sample: res.text }, null, 2));
   } catch (e) {
-    fs.writeFileSync(opts.out, JSON.stringify({ ok: false, phase, error: String(e.message ?? e) }, null, 2));
+    fs.writeFileSync(opts.out, JSON.stringify({ ok: false, phase, error: String(e.message ?? e), code: e.code, codexErrorInfo: e.codexErrorInfo }, null, 2));
     process.exitCode = 1;
   } finally {
     if (client) await client.close();
@@ -73,7 +90,7 @@ async function cmdCheck(opts) {
 async function main() {
   const [sub, ...rest] = process.argv.slice(2);
   if (sub === "turn") {
-    await cmdTurn(parseArgs(rest, { flags: [], values: ["sandbox", "prompt-file", "schema", "resume", "out"] }));
+    await cmdTurn(parseArgs(rest, { flags: [], values: ["sandbox", "prompt-file", "schema", "resume", "out", "model", "effort", "run-id"] }));
   } else if (sub === "check") {
     await cmdCheck(parseArgs(rest, { flags: [], values: ["out"] }));
   } else {
@@ -82,4 +99,4 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error(e.message ?? e); process.exitCode = 1; });
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().catch((e) => { console.error(e.message ?? e); process.exitCode = 1; });
