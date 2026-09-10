@@ -1,5 +1,7 @@
 # Changelog
 
+**English** | [한국어](CHANGELOG.ko.md)
+
 ## 3.1.1 — 2026-09-10
 
 ### Fixed
