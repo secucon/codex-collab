@@ -1,6 +1,19 @@
 // scripts/consensus.mjs
 import fs from "node:fs";
 import { parseArgs } from "./lib/args.mjs";
+import { createHash } from "node:crypto";
+import { pathToFileURL } from "node:url";
+
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map(k => [k, canonical(value[k])]));
+  return value;
+}
+
+export function proposalId(proposal) {
+  if (!proposal || typeof proposal !== "object" || Array.isArray(proposal)) throw new Error("proposal must be an object");
+  return createHash("sha256").update(JSON.stringify(canonical(proposal))).digest("hex");
+}
 
 // A codex-client wrapper for a turn that died carries status:"error" and a null
 // `structured`. Scored naively that reads as key_points=[] +
@@ -11,8 +24,8 @@ function usablePosition(side, pos) {
   if (pos === null || typeof pos !== "object") throw new Error(`${side} position is not usable: expected an object`);
   let position = pos;
   if ("structured" in pos || "status" in pos) {
-    if (pos.status === "error") {
-      throw new Error(`${side} position is not usable: turn status "error" — ${pos.error ?? "no error text"}`);
+    if (pos.status !== "completed") {
+      throw new Error(`${side} position is not usable: turn status "${pos.status}" — ${pos.error ?? "no error text"}`);
     }
     if (pos.structured === null || pos.structured === undefined) {
       throw new Error(`${side} position is not usable: structured output is missing (status "${pos.status}")`);
@@ -28,14 +41,17 @@ function usablePosition(side, pos) {
   if (typeof position.agrees_with_opponent !== "boolean") {
     throw new Error(`${side} position is not usable: agrees_with_opponent must be a boolean`);
   }
-  if (!Array.isArray(position.key_points)) {
-    throw new Error(`${side} position is not usable: key_points must be an array`);
+  if (!Array.isArray(position.key_points) || position.key_points.some(p => typeof p !== "string")) {
+    throw new Error(`${side} position is not usable: key_points must be an array of strings`);
   }
   return position;
 }
 
 export function evaluateConsensus(claudePos, codexPos, opts) {
   const { round, defaultRounds, maxExtra } = opts;
+  for (const [name, value] of Object.entries({ round, defaultRounds, maxExtra: maxExtra ?? 0 })) {
+    if (!Number.isSafeInteger(value) || value < (name === "maxExtra" ? 0 : 1)) throw new Error(`${name} must be a valid ${name === "maxExtra" ? "non-negative" : "positive"} integer`);
+  }
   const cap = defaultRounds + Math.max(0, Math.min(maxExtra ?? 0, 2));
   // Tolerate both a raw position and a codex-client wrapper ({ threadId, text,
   // structured, status }) — the position fields live under `.structured` in the
@@ -47,14 +63,16 @@ export function evaluateConsensus(claudePos, codexPos, opts) {
   let divergence = 0;
   for (const p of a) if (!b.has(p)) divergence++;
   for (const p of b) if (!a.has(p)) divergence++;
-  const consensus = Boolean(claude.agrees_with_opponent) && Boolean(codex.agrees_with_opponent);
+  const expected = opts.proposal ? proposalId(opts.proposal) : null;
+  const consensus = expected !== null && claude.agrees_with_opponent && codex.agrees_with_opponent
+    && claude.accepted_proposal_id === expected && codex.accepted_proposal_id === expected;
   const capReached = round >= cap;
   const reason = consensus
-    ? "both sides agree"
+    ? "both sides accept the same proposal"
     : capReached
       ? `round cap ${cap} reached without consensus`
       : `divergence ${divergence}, continue`;
-  return { consensus, divergence, capReached, reason };
+  return { consensus, divergence, capReached, reason, proposalId: expected };
 }
 
 // `capReached: true` forces the loop to stop: a round that cannot be scored must
@@ -66,7 +84,7 @@ function gateErrorMarker(error) {
 function main() {
   const opts = parseArgs(process.argv.slice(2), {
     flags: [],
-    values: ["claude", "codex", "round", "default-rounds", "max-extra", "out"]
+    values: ["claude", "codex", "round", "default-rounds", "max-extra", "out", "proposal"]
   });
   // Same pending-marker-first rule as codex-client: a crash, a kill, or an
   // unusable input must never leave a previous round's verdict readable as this
@@ -78,7 +96,8 @@ function main() {
     const result = evaluateConsensus(claudePos, codexPos, {
       round: Number(opts.round),
       defaultRounds: Number(opts["default-rounds"] ?? 3),
-      maxExtra: Number(opts["max-extra"] ?? 2)
+      maxExtra: Number(opts["max-extra"] ?? 2),
+      proposal: opts.proposal ? JSON.parse(fs.readFileSync(opts.proposal, "utf8")) : null
     });
     fs.writeFileSync(opts.out, JSON.stringify(result, null, 2));
   } catch (e) {
@@ -88,4 +107,4 @@ function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

@@ -23,18 +23,32 @@ function send(obj) { process.stdout.write(JSON.stringify(obj) + "\n"); }
 if (process.env.FAKE_STDOUT_BANNER) process.stdout.write("warning: something non-JSON\n");
 
 const rl = readline.createInterface({ input: process.stdin });
+if (process.env.FAKE_IGNORE_TERM) {
+  process.on("SIGTERM", () => {});
+  setInterval(() => {}, 1000);
+}
 let threadSeq = 0;
 let turnSeq = 0;
+let finishRequest;
+let threadOptions;
 
 rl.on("line", (line) => {
   if (!line.trim()) return;
   const msg = JSON.parse(line);
+  if (msg.id === "server-request" && !msg.method) {
+    if (!msg.result && !msg.error) throw new Error("missing server request response");
+    finishRequest?.(JSON.stringify(msg));
+    return;
+  }
   if (msg.method === "initialize") {
     if (process.env.FAKE_NO_INIT_RESPONSE) return; // wedged at handshake
     return send({ id: msg.id, result: { } });
   }
   if (msg.method === "initialized") return;
+  if (msg.method === "turn/interrupt") return send({ id: msg.id, result: {} });
   if (msg.method === "thread/start" || msg.method === "thread/resume") {
+    if (process.env.FAKE_REQUIRE_RESUME && msg.method !== "thread/resume") return send({ id: msg.id, error: { message: "expected thread/resume" } });
+    threadOptions = msg.params;
     const id = msg.params.threadId ?? `thread-${++threadSeq}`;
     return send({ id: msg.id, result: { thread: { id } } });
   }
@@ -49,13 +63,27 @@ rl.on("line", (line) => {
     send({ method: "turn/started", params: { threadId, turn: { id: turnId } } });
     if (process.env.FAKE_HANG_TURN) return; // acked, then silence forever
     if (process.env.FAKE_TURN_ERROR) {
-      send({ method: "error", params: { error: { message: process.env.FAKE_TURN_ERROR } } });
+      send({ method: "error", params: { threadId, turnId, error: { message: process.env.FAKE_TURN_ERROR } } });
       return;
     }
-    const text = process.env.FAKE_ECHO_SCHEMA ? JSON.stringify(msg.params.outputSchema)
+    if (process.env.FAKE_RETRY_ERROR) send({ method: "error", params: { threadId, turnId, willRetry: true, error: { message: "retrying" } } });
+    if (process.env.FAKE_UNRELATED) {
+      send({ method: "item/completed", params: { threadId: "other", turnId, item: { type: "agentMessage", text: "wrong" } } });
+      send({ method: "turn/completed", params: { threadId, turn: { id: "old-turn", status: "interrupted" } } });
+    }
+    const text = process.env.FAKE_ECHO_OPTIONS ? JSON.stringify({ model: threadOptions.model, sandbox: threadOptions.sandbox, effort: msg.params.effort })
+      : process.env.FAKE_ECHO_SCHEMA ? JSON.stringify(msg.params.outputSchema)
       : process.env.FAKE_STRUCTURED ?? process.env.FAKE_TURN_TEXT ?? "ok";
-    send({ method: "item/completed", params: { threadId, item: { type: "agentMessage", phase: "final_answer", text } } });
-    send({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "completed" } } });
+    const finish = (answer = text) => {
+      send({ method: "thread/tokenUsage/updated", params: { threadId, tokenUsage: { total: { totalTokens: 123 } } } });
+      send({ method: "item/completed", params: { threadId, turnId, item: { type: "agentMessage", phase: "final_answer", text: answer } } });
+      if (process.env.FAKE_COMMENTARY) send({ method: "item/completed", params: { threadId, turnId, item: { type: "agentMessage", phase: "commentary", text: "not the answer" } } });
+      send({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: process.env.FAKE_STATUS ?? "completed" } } });
+    };
+    if (process.env.FAKE_SERVER_REQUEST) {
+      finishRequest = finish;
+      send({ id: "server-request", method: process.env.FAKE_SERVER_REQUEST, params: { threadId, turnId } });
+    } else finish();
     return;
   }
 });

@@ -142,3 +142,40 @@ test("check closes the client and exits promptly on a server error", async () =>
   assert.equal(res.ok, false);
   assert.match(res.error, /boom/);
 });
+
+test("interrupted turns write errors and check cannot report ok", async () => {
+  const promptFile = tmp("p.txt"); fs.writeFileSync(promptFile, "hi");
+  for (const sub of ["turn", "check"]) {
+    const out = tmp("o.json");
+    const args = [CLIENT, sub, "--out", out];
+    if (sub === "turn") args.push("--prompt-file", promptFile, "--run-id", "test-run");
+    await assert.rejects(run(process.execPath, args, { env: fakeEnv({ FAKE_STATUS: "interrupted" }), timeout: 5000 }));
+    const result = JSON.parse(fs.readFileSync(out));
+    assert.match(result.error, /interrupted/);
+    if (sub === "check") assert.equal(result.ok, false);
+    else { assert.equal(result.status, "error"); assert.equal(result.runId, "test-run"); }
+  }
+});
+
+test("CLI forwards model and effort and records run ID, timing and token usage", async () => {
+  const promptFile = tmp("p.txt"); fs.writeFileSync(promptFile, "hi");
+  const out = tmp("o.json");
+  await run(process.execPath, [CLIENT, "turn", "--prompt-file", promptFile, "--out", out,
+    "--model", "test-model", "--effort", "low", "--run-id", "test-run"], { env: fakeEnv({ FAKE_ECHO_OPTIONS: "1" }) });
+  const r = JSON.parse(fs.readFileSync(out));
+  assert.deepEqual(JSON.parse(r.text), { model: "test-model", effort: "low", sandbox: "read-only" });
+  assert.equal(r.runId, "test-run");
+  assert.equal(r.tokenUsage.total.totalTokens, 123);
+  assert.equal(r.metrics.promptBytes, 2);
+  assert.ok(r.metrics.totalMs >= r.metrics.turnMs);
+});
+
+test("bundled evaluation rejects parseable JSON that violates its contract", async () => {
+  const promptFile = tmp("p.txt"); fs.writeFileSync(promptFile, "hi");
+  const out = tmp("o.json");
+  const schema = fileURLToPath(new URL("../schemas/evaluation.json", import.meta.url));
+  await assert.rejects(run(process.execPath, [CLIENT, "turn", "--prompt-file", promptFile, "--out", out, "--schema", schema], {
+    env: fakeEnv({ FAKE_STRUCTURED: '{"summary":"x","findings":[],"confidence":2}' }), timeout: 5000,
+  }));
+  assert.match(JSON.parse(fs.readFileSync(out)).error, /confidence/);
+});

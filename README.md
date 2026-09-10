@@ -39,10 +39,22 @@ Sandbox is enforced in code (`read-only` by default; `workspace-write` only on a
 
 Verified live on 2026-08-16 against a real Codex: under `read-only` a write request is refused and no file is created; under `workspace-write` a write inside the working directory succeeds while a write to a path outside it is refused. Note that Codex's `workspace-write` policy also permits writes to `/tmp` and `$TMPDIR` — that is Codex's own sandbox definition, not just the working directory, so do not treat "workspace-write" as "cwd only".
 
-The consensus gate refuses to score a turn that failed: a `status: "error"` or missing `structured` on either side exits non-zero and writes a stop marker, so a crashed Codex turn cannot silently become a debate round.
+Only `status: "completed"` is a successful turn. Failed/interrupted turns, malformed JSON, and invalid bundled output contracts are rejected. The consensus gate requires both models to explicitly accept the same candidate proposal's SHA-256; accepting different previous positions is not consensus. The approved apply content comes from that shared proposal.
+
+Every invocation gets a UUID directory under `.codex-collab/runs/`. Node manages debate state, exclusive round locks, thread resume and the five-round cap. Reports live in each run's `report.md`. First-round analysis is blind; subsequent rounds discuss a fixed shared candidate. The models share filesystem access, so anti-anchoring is a behavioral rule, not filesystem isolation.
+
+Existing boolean-only debate artifacts do not establish consensus with the new position schema. Start a fresh debate after upgrading; old reports remain untouched.
+
+## Performance controls
+
+`codex-client.mjs turn` and `workflow.mjs round` accept `--model` and `--effort`. Results record connection, thread start/resume and turn durations, total time through result creation (excluding shutdown), prompt bytes and server-reported token usage. Token usage is null when the server does not report it; it is not a billing estimate.
+
+Resumed debate prompts send the new candidate instead of repeating Codex's previous replies. Each round still starts a fresh app-server process, and evaluation remains sequential. Measure the recorded timings before adding a persistent connection or parallel evaluation.
 
 ## Development
 
 `npm test` runs the unit suite (no Codex needed — a protocol fake is used).
 
-Hang protection: JSON-RPC requests time out after 30s and an acknowledged turn times out after 10 minutes without `turn/completed` (override via `CODEX_COLLAB_REQUEST_TIMEOUT_MS` / `CODEX_COLLAB_TURN_TIMEOUT_MS`). `turn`/`check` write a failure marker to `--out` before doing any work, so even a killed process never leaves a previous run's result readable as fresh. CI additionally runs a drift canary against the real Codex CLI: it detects client-liveness and app-server protocol/handshake drift (the `initialize` handshake needs no auth, so a broken handshake fails the build). Asserting a fully successful live turn additionally requires Codex auth in CI, so a turn-level auth failure is tolerated.
+Hang protection: JSON-RPC requests time out after 30s and an acknowledged turn times out after 10 minutes (override via `CODEX_COLLAB_REQUEST_TIMEOUT_MS` / `CODEX_COLLAB_TURN_TIMEOUT_MS`). A timed-out turn is interrupted; shutdown sends SIGTERM after 50ms and SIGKILL after 1s if necessary. `turn`/`check` write failure markers before connecting. The non-interactive client declines permission/elicitation requests and explicitly rejects unsupported server requests.
+
+CI runs unit tests on Node 18/20/22/24, a required Codex 0.154.0 canary and an advisory latest-CLI canary. Only explicit post-handshake authentication failures are tolerated; invalid parameters and timeouts fail the canary. An unauthenticated canary does not verify model output or structured-schema acceptance. A failed or interrupted debate stops; do not remove a round lock while a prior invocation might still be alive.

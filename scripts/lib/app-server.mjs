@@ -1,9 +1,23 @@
 // scripts/lib/app-server.mjs
 import { spawn } from "node:child_process";
 import readline from "node:readline";
+import fs from "node:fs";
 
-const CLIENT_INFO = { title: "codex-collab", name: "Claude Code", version: "3.0.2" };
+const CLIENT_INFO = { title: "codex-collab", name: "codex-collab", version: JSON.parse(fs.readFileSync(new URL("../../package.json", import.meta.url))).version };
 const CAPABILITIES = { experimentalApi: false, requestAttestation: false };
+
+function timeout(value, fallback) {
+  const n = Number(value ?? fallback);
+  if (!Number.isSafeInteger(n) || n <= 0 || n > 2_147_483_647) throw new Error("timeout must be a positive integer <= 2147483647");
+  return n;
+}
+
+function protocolError(error, fallback) {
+  return Object.assign(new Error(error?.message ?? fallback), {
+    code: error?.code, codexErrorInfo: error?.codexErrorInfo ?? error?.data?.codexErrorInfo,
+    additionalDetails: error?.additionalDetails,
+  });
+}
 
 export class CodexAppServerClient {
   constructor(cwd) {
@@ -19,14 +33,15 @@ export class CodexAppServerClient {
 
   static async connect(cwd, { command = "codex", args = ["app-server"], env, requestTimeoutMs } = {}) {
     const client = new CodexAppServerClient(cwd);
-    client.requestTimeoutMs = requestTimeoutMs ?? Number(process.env.CODEX_COLLAB_REQUEST_TIMEOUT_MS ?? 30_000);
+    client.requestTimeoutMs = timeout(requestTimeoutMs ?? process.env.CODEX_COLLAB_REQUEST_TIMEOUT_MS, 30_000);
     client.proc = spawn(command, args, { cwd, env: env ?? process.env, stdio: ["pipe", "pipe", "pipe"] });
     client.proc.stdout.setEncoding("utf8");
     client.proc.stderr.setEncoding("utf8");
-    client.proc.stderr.on("data", (c) => (client.stderr += c));
+    client.proc.stderr.on("data", (c) => (client.stderr = (client.stderr + c).slice(-65536)));
+    client.proc.stdin.on("error", (e) => { client._rejectWork(e); client.proc.kill("SIGTERM"); });
     client.proc.on("error", (e) => client._handleExit(e));
     client.proc.on("exit", (code, signal) => {
-      const err = code === 0 || code === null ? null
+      const err = code === 0 && !signal ? null
         : new Error(`codex app-server exited (${signal ? "signal " + signal : "code " + code}).${client.stderr ? "\n" + client.stderr.trim() : ""}`);
       client._handleExit(err);
     });
@@ -45,7 +60,7 @@ export class CodexAppServerClient {
   }
 
   _send(msg) {
-    if (!this.proc?.stdin) throw new Error("codex app-server stdin unavailable");
+    if (this._exited || !this.proc?.stdin || this.proc.stdin.destroyed) throw new Error("codex app-server stdin unavailable");
     this.proc.stdin.write(JSON.stringify(msg) + "\n");
   }
   _request(method, params) {
@@ -59,7 +74,8 @@ export class CodexAppServerClient {
       }, timeoutMs);
       timer.unref?.();
       this.pending.set(id, { resolve, reject, method, timer });
-      this._send({ id, method, params });
+      try { this._send({ id, method, params }); }
+      catch (e) { clearTimeout(timer); this.pending.delete(id); reject(e); }
     });
   }
   _notify(method, params = {}) { if (!this.closed) this._send({ method, params }); }
@@ -71,12 +87,24 @@ export class CodexAppServerClient {
     // the client down — a single such line must not break every turn.
     try { msg = JSON.parse(line); }
     catch { return; }
+    if (!msg || typeof msg !== "object" || Array.isArray(msg)) return;
+    if (msg.id !== undefined && msg.method) {
+      // This non-interactive client never grants extra permissions.
+      let result;
+      if (["item/commandExecution/requestApproval", "item/fileChange/requestApproval"].includes(msg.method)) result = { decision: "decline" };
+      else if (msg.method === "mcpServer/elicitation/request") result = { action: "decline", content: null };
+      else if (msg.method === "item/permissions/requestApproval") result = { permissions: {}, scope: "turn" };
+      try {
+        this._send(result ? { id: msg.id, result } : { id: msg.id, error: { code: -32601, message: `Unsupported client request: ${msg.method}` } });
+      } catch (e) { this._rejectWork(e); }
+      return;
+    }
     if (msg.id !== undefined && !msg.method) {
       const p = this.pending.get(msg.id);
       if (!p) return;
       this.pending.delete(msg.id);
       clearTimeout(p.timer);
-      if (msg.error) p.reject(new Error(msg.error.message ?? `${p.method} failed`));
+      if (msg.error) p.reject(protocolError(msg.error, `${p.method} failed`));
       else p.resolve(msg.result ?? {});
       return;
     }
@@ -86,14 +114,24 @@ export class CodexAppServerClient {
   _handleNotification(msg) {
     const w = this._turnWaiter;
     if (!w) return;
+    if (msg.params?.threadId !== w.threadId) return;
+    // The server may flush notifications in the same chunk as the start ACK.
+    if (!w.turnId) { w.events.push(msg); return; }
+    const turnId = msg.params?.turnId ?? msg.params?.turn?.id;
+    if (msg.method === "thread/tokenUsage/updated") { w.tokenUsage = msg.params.tokenUsage; return; }
+    if (turnId !== w.turnId) return;
     if (msg.method === "item/completed" && msg.params?.item?.type === "agentMessage") {
-      if (typeof msg.params.item.text === "string") w.text = msg.params.item.text;
+      const item = msg.params.item;
+      if (typeof item.text === "string" && item.phase !== "commentary") w.text = item.text;
     } else if (msg.method === "error") {
+      if (msg.params.willRetry === true) return;
       const waiter = this._turnWaiter; this._turnWaiter = null;
-      waiter.reject(new Error(msg.params?.error?.message ?? "codex error"));
+      waiter.reject(protocolError(msg.params?.error, "codex error"));
     } else if (msg.method === "turn/completed") {
       const waiter = this._turnWaiter; this._turnWaiter = null;
-      waiter.resolve({ text: waiter.text ?? "", status: msg.params?.turn?.status ?? "completed" });
+      const turn = msg.params.turn;
+      if (turn.status !== "completed") waiter.reject(protocolError(turn.error, `turn ${turn.status ?? "has no status"}`));
+      else waiter.resolve({ text: waiter.text ?? "", status: turn.status, tokenUsage: waiter.tokenUsage ?? null });
     }
   }
 
@@ -101,10 +139,14 @@ export class CodexAppServerClient {
     if (this._exited) return;
     this._exited = true;
     this.exitError = err ?? null;
+    this._rejectWork(err ?? new Error("app-server closed"));
+    this._resolveExit();
+  }
+
+  _rejectWork(err) {
     for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(err ?? new Error("app-server closed")); }
     this.pending.clear();
     if (this._turnWaiter) { const w = this._turnWaiter; this._turnWaiter = null; w.reject(err ?? new Error("app-server closed")); }
-    this._resolveExit();
   }
 
   async startThread({ sandbox = "read-only", model = null } = {}) {
@@ -119,18 +161,23 @@ export class CodexAppServerClient {
   }
   async runTurn(threadId, { prompt, outputSchema = null, effort = null, turnTimeoutMs = null }) {
     if (!prompt || !prompt.trim()) throw new Error("prompt required");
-    const timeoutMs = turnTimeoutMs ?? Number(process.env.CODEX_COLLAB_TURN_TIMEOUT_MS ?? 600_000);
+    if (this._turnWaiter) throw new Error("a turn is already running on this client");
+    const timeoutMs = timeout(turnTimeoutMs ?? process.env.CODEX_COLLAB_TURN_TIMEOUT_MS, 600_000);
     let w;
-    const done = new Promise((resolve, reject) => { w = this._turnWaiter = { resolve, reject, threadId, text: null }; });
+    const done = new Promise((resolve, reject) => { w = this._turnWaiter = { resolve, reject, threadId, turnId: null, events: [], text: null }; });
     // Ensure a mid-flight rejection of `done` (e.g. the child exiting between
     // turn/start being sent and its response arriving) is always considered
     // handled. The real `await done` below still surfaces the rejection on the
     // normal path; this only guards the window before we reach it.
     done.catch(() => {});
     try {
-      await this._request("turn/start", {
+      const ack = await this._request("turn/start", {
         threadId, input: [{ type: "text", text: prompt, text_elements: [] }], model: null, effort, outputSchema
       });
+      if (!ack.turn?.id) throw new Error("turn/start response has no turn id");
+      w.turnId = ack.turn.id;
+      for (const event of w.events) this._handleNotification(event);
+      w.events = [];
     } catch (e) {
       this._turnWaiter = null;
       throw e;
@@ -139,6 +186,7 @@ export class CodexAppServerClient {
     // turn/completed (or error) notification. Guard against it never arriving.
     const timer = setTimeout(() => {
       if (this._turnWaiter === w) this._turnWaiter = null;
+      if (!this.closed && !this._exited) this._request("turn/interrupt", { threadId, turnId: w.turnId }).catch(() => {});
       w.reject(new Error(`turn timed out after ${timeoutMs}ms without turn/completed`));
     }, timeoutMs);
     timer.unref?.();
@@ -146,16 +194,24 @@ export class CodexAppServerClient {
     try { result = await done; }
     finally { clearTimeout(timer); }
     let structured = null;
-    if (outputSchema) { try { structured = JSON.parse(result.text); } catch { structured = null; } }
-    return { text: result.text, structured, status: result.status };
+    if (outputSchema) {
+      try { structured = JSON.parse(result.text); }
+      catch { throw new Error("structured output is not valid JSON"); }
+      if (structured === null) throw new Error("structured output is null");
+    }
+    return { text: result.text, structured, status: result.status, tokenUsage: result.tokenUsage, turnId: w.turnId };
   }
   async close() {
     if (this.closed) { await this.exitPromise; return; }
     this.closed = true;
     if (this.rl) this.rl.close();
-    if (this.proc && !this.proc.killed) {
+    if (this.proc && this.proc.exitCode === null && this.proc.signalCode === null) {
       this.proc.stdin.end();
-      setTimeout(() => { if (this.proc && this.proc.exitCode === null) this.proc.kill("SIGTERM"); }, 50).unref?.();
+      const term = setTimeout(() => this.proc.kill("SIGTERM"), 50);
+      const kill = setTimeout(() => this.proc.kill("SIGKILL"), 1000);
+      try { await this.exitPromise; }
+      finally { clearTimeout(term); clearTimeout(kill); }
+      return;
     }
     await this.exitPromise;
   }
