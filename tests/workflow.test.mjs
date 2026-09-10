@@ -90,3 +90,30 @@ test("five non-consensus rounds stop and are all persisted", async t => {
   assert.equal(JSON.parse(fs.readFileSync(path.join(dir, "state.json"))).rounds.length, 5);
   await assert.rejects(debateRound(dir), /not ready/);
 });
+
+for (const variant of ["wrong-id", "true-null", "invalid-hex"]) {
+  test(`Codex ${variant} vote is recorded as non-acceptance and the debate can subsequently converge`, async t => {
+    const root = setup(t), { dir } = initRun("debate", root);
+    fs.writeFileSync(path.join(dir, "topic.txt"), "Topic");
+    put(path.join(dir, "round-1-claude.json"), position);
+    process.env.FAKE_STRUCTURED = JSON.stringify(position);
+    const first = await debateRound(dir);
+    const vote = { ...position, agrees_with_opponent: true, accepted_proposal_id: first.nextProposalId };
+    put(path.join(dir, "round-2-claude.json"), vote);
+    const wrongId = (first.nextProposalId[0] === "0" ? "1" : "0") + first.nextProposalId.slice(1);
+    const malformed = { ...vote, accepted_proposal_id: variant === "true-null" ? null : variant === "invalid-hex" ? "g" + first.nextProposalId.slice(1) : wrongId };
+    process.env.FAKE_STRUCTURED = JSON.stringify(malformed);
+    const second = await debateRound(dir);
+    assert.equal(second.status, "ready");
+    assert.equal(second.consensus.consensus, false);
+    assert.equal(second.warnings.codex.length, 1);
+    const state = JSON.parse(fs.readFileSync(path.join(dir, "state.json")));
+    assert.equal(state.rounds[1].codex.accepted_proposal_id, null);
+    assert.deepEqual(state.rounds[1].originalVotes.codex.accepted_proposal_id, malformed.accepted_proposal_id);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, "round-2-codex.json"))).structured.accepted_proposal_id, malformed.accepted_proposal_id);
+    const finalVote = { ...vote, accepted_proposal_id: second.nextProposalId };
+    put(path.join(dir, "round-3-claude.json"), finalVote);
+    process.env.FAKE_STRUCTURED = JSON.stringify(finalVote);
+    assert.equal((await debateRound(dir)).consensus.consensus, true);
+  });
+}

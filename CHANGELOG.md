@@ -11,6 +11,9 @@
 - Only completed turns succeed. Interrupted/failed turns and invalid structured
   JSON become error results; bundled position/evaluation outputs also receive
   local domain validation. Check no longer reports interrupted turns as healthy.
+- Completed position outputs with malformed, inconsistent or stale proposal
+  votes count as non-acceptance with warnings and preserved original votes.
+  Analysis-body and transport failures still stop the run; a voting typo does not.
 - Match notifications by thread and turn, preserve final answers over commentary,
   tolerate retryable errors, and answer server requests with declines or explicit
   unsupported-method errors. Reject overlapping turns on one client.
@@ -21,6 +24,9 @@
 - CI distinguishes explicit authentication failures from protocol errors; a pinned
   0.154.0 canary is required and latest-CLI drift remains advisory. Unit matrix
   covers Node 18, 20, 22 and 24.
+- Recognize the real CLI's explicit missing-credentials 401 message with URL and
+  request metadata even when `codexErrorInfo` is `other`; unrelated errors remain
+  failures.
 
 ### Changed
 - Node now builds debate prompts, resumes threads, scores and records rounds,
@@ -30,6 +36,9 @@
   prompt bytes, turn ID and server-reported token usage (null when unavailable).
 - Runs and reports live under `.codex-collab/runs/<runId>/`. Persistent connections
   and parallel model evaluation remain deferred until latency is measured.
+- Added an opt-in authenticated two-round check (deterministic Claude-side
+  fixture). Passed on Codex 0.154.0 on 2026-09-10: structured output, same-thread
+  resume and shared-proposal consensus, with observed protocol field shapes.
 
 ## 3.1.0 — 2026-08-16
 

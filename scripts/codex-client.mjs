@@ -42,7 +42,9 @@ export async function cmdTurn(opts) {
     const res = await client.runTurn(threadId, { prompt, outputSchema, effort: opts.effort ?? null });
     if (opts.schema) {
       const schemaPath = fs.realpathSync(opts.schema);
-      if (schemaPath === fileURLToPath(new URL("../schemas/position.json", import.meta.url))) validatePosition(res.structured);
+      // Vote consistency requires this round's candidate, which the workflow
+      // owns. Preserve raw votes here so it can record and normalize slips.
+      if (schemaPath === fileURLToPath(new URL("../schemas/position.json", import.meta.url))) validatePosition(res.structured, { validateVote: false });
       if (schemaPath === fileURLToPath(new URL("../schemas/evaluation.json", import.meta.url))) validateEvaluation(res.structured);
     }
     const result = { runId: opts["run-id"] ?? null, threadId, ...res, metrics: {

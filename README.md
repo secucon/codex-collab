@@ -41,6 +41,8 @@ Verified live on 2026-08-16 against a real Codex: under `read-only` a write requ
 
 Only `status: "completed"` is a successful turn. Failed/interrupted turns, malformed JSON, and invalid bundled output contracts are rejected. The consensus gate requires both models to explicitly accept the same candidate proposal's SHA-256; accepting different previous positions is not consensus. The approved apply content comes from that shared proposal.
 
+A malformed or mismatched vote in an otherwise valid completed analysis counts as non-acceptance. The round records warnings and original votes, and the debate can continue. Analysis-body and transport failures still stop the run.
+
 Every invocation gets a UUID directory under `.codex-collab/runs/`. Node manages debate state, exclusive round locks, thread resume and the five-round cap. Reports live in each run's `report.md`. First-round analysis is blind; subsequent rounds discuss a fixed shared candidate. The models share filesystem access, so anti-anchoring is a behavioral rule, not filesystem isolation.
 
 Existing boolean-only debate artifacts do not establish consensus with the new position schema. Start a fresh debate after upgrading; old reports remain untouched.
@@ -54,6 +56,8 @@ Resumed debate prompts send the new candidate instead of repeating Codex's previ
 ## Development
 
 `npm test` runs the unit suite (no Codex needed — a protocol fake is used).
+
+`node tests/manual/live-debate-check.mjs` explicitly runs two authenticated, read-only Codex turns against a deterministic peer fixture. It checks structured output, thread resume and consensus and saves protocol field shapes in a temporary run directory. This consumes model usage and is not part of `npm test`.
 
 Hang protection: JSON-RPC requests time out after 30s and an acknowledged turn times out after 10 minutes (override via `CODEX_COLLAB_REQUEST_TIMEOUT_MS` / `CODEX_COLLAB_TURN_TIMEOUT_MS`). A timed-out turn is interrupted; shutdown sends SIGTERM after 50ms and SIGKILL after 1s if necessary. `turn`/`check` write failure markers before connecting. The non-interactive client declines permission/elicitation requests and explicitly rejects unsupported server requests.
 

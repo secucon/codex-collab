@@ -29,6 +29,8 @@ You orchestrate cross-model collaboration. Attribute each model's findings separ
 
 4. If the command fails, STOP and report the error. Do not delete a lock, retry an uncertain turn, or advance the state manually. If status is completed, report the outcome. A cap stop is not consensus.
 
+   Malformed or mismatched votes in completed analyses are recorded as non-acceptance with warnings; these are not failed turns. Include the warnings in the report and continue according to the returned status. Never correct a malformed vote into acceptance yourself. Original votes are retained in state and raw input/output artifacts.
+
 5. Otherwise read <dir>/state.json: it contains Codex's prior position and the fixed nextProposal. The round command also returns nextProposalId, the SHA-256 of that exact candidate. Form your next position against BOTH the previous Codex findings and this candidate, and save it to <dir>/round-<next-number>-claude.json.
 
    Set agrees_with_opponent=true and copy nextProposalId into accepted_proposal_id ONLY if you accept the entire candidate unchanged. If you have amendments or disagree, use false and null and describe your revised position. Both models vote on the SAME candidate; accepting an opponent's old position alone does not establish consensus. Repeat step 3.

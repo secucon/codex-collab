@@ -10,7 +10,8 @@ export function canaryPasses(result) {
   ));
   // Older CLI versions provide only text for missing local credentials. Match
   // explicit authentication failures, never an arbitrary post-handshake error.
-  return Boolean(unauthorized || /^(not logged in\.?|authentication required\.?|missing bearer or basic authentication in header\.?)$/i.test(result.error ?? ""));
+  const missingCredentials = /^unexpected status 401 Unauthorized: Missing bearer or basic authentication in header(?:, url: https:\/\/api\.openai\.com\/v1\/responses(?:, cf-ray: [A-Za-z0-9-]+)?(?:, request id: [A-Za-z0-9_-]+)?)?\.?$/i.test(result.error ?? "");
+  return Boolean(unauthorized || missingCredentials || /^(not logged in\.?|authentication required\.?|missing bearer or basic authentication in header\.?)$/i.test(result.error ?? ""));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

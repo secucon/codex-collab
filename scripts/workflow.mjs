@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "./lib/args.mjs";
-import { validatePosition } from "./lib/contracts.mjs";
+import { normalizePositionVote } from "./lib/contracts.mjs";
 import { cmdTurn } from "./codex-client.mjs";
 import { evaluateConsensus, proposalId } from "./consensus.mjs";
 
@@ -35,10 +35,10 @@ export async function debateRound(dir, options = {}) {
     if (state.kind !== "debate" || state.status !== "ready" || !Number.isInteger(state.round) || state.round < 0 || state.round >= 5) throw new Error("debate is not ready for another round");
     const round = state.round + 1;
     const prefix = path.join(dir, `round-${round}`);
-    const claude = validatePosition(read(`${prefix}-claude.json`));
     const proposal = state.nextProposal ?? null;
     const id = proposal ? proposalId(proposal) : null;
-    if (claude.accepted_proposal_id !== null && claude.accepted_proposal_id !== id) throw new Error("Claude accepted a proposal other than this round's candidate");
+    const claudeVote = normalizePositionVote(read(`${prefix}-claude.json`), id);
+    const claude = claudeVote.position;
     const topic = fs.readFileSync(path.join(dir, "topic.txt"), "utf8");
     const prompt = proposal
       ? `${topic}\n\nEvaluate this fixed candidate from Claude's previous position. Return your current position and objections. Accept ONLY if you endorse the entire candidate unchanged: set agrees_with_opponent=true and accepted_proposal_id to ${id}. Otherwise use false and null. Your earlier turns are already in this thread.\nCandidate:\n${JSON.stringify(proposal)}\n`
@@ -53,10 +53,13 @@ export async function debateRound(dir, options = {}) {
       out: `${prefix}-codex.json`, resume: state.threadId, "run-id": state.runId,
       model: options.model, effort: options.effort,
     });
-    if (codex.structured.accepted_proposal_id !== null && codex.structured.accepted_proposal_id !== id) throw new Error("Codex accepted a proposal other than this round's candidate");
-    const consensus = evaluateConsensus(claude, codex, { round, defaultRounds: 3, maxExtra: 2, proposal });
+    const codexVote = normalizePositionVote(codex.structured, id);
+    const warnings = { claude: claudeVote.warnings, codex: codexVote.warnings };
+    const consensus = evaluateConsensus(claude, { ...codex, structured: codexVote.position }, { round, defaultRounds: 3, maxExtra: 2, proposal });
     write(`${prefix}-consensus.json`, consensus);
-    state.rounds.push({ round, claude, codex: codex.structured, proposal, consensus, metrics: codex.metrics, tokenUsage: codex.tokenUsage });
+    state.rounds.push({ round, claude, codex: codexVote.position, proposal, consensus, warnings,
+      originalVotes: { claude: claudeVote.originalVote, codex: codexVote.originalVote },
+      metrics: codex.metrics, tokenUsage: codex.tokenUsage });
     state.round = round;
     state.threadId = codex.threadId;
     state.status = consensus.consensus || consensus.capReached ? "completed" : "ready";
@@ -68,7 +71,7 @@ export async function debateRound(dir, options = {}) {
       proposed_change: claude.proposed_change ?? null,
     } : null;
     write(path.join(dir, "state.json"), state);
-    return { runId: state.runId, status: state.status, round, consensus, agreedProposal: state.agreedProposal,
+    return { runId: state.runId, status: state.status, round, consensus, warnings, agreedProposal: state.agreedProposal,
       nextProposal: state.nextProposal, nextProposalId: state.nextProposal ? proposalId(state.nextProposal) : null };
   } catch (e) {
     if (started) {
