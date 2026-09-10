@@ -1,5 +1,7 @@
 # codex-collab v3
 
+**English** | [한국어](README.ko.md)
+
 Claude Code <-> OpenAI Codex cross-model collaboration — **debate**, **cross-verify**, and **ask** — built on the stable `codex app-server` JSON-RPC protocol.
 
 ## Why v3
