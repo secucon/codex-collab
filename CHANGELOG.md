@@ -2,6 +2,13 @@
 
 **English** | [한국어](CHANGELOG.ko.md)
 
+## 3.1.2 — 2026-11-20
+
+### Changed
+- Minimum Node is now 22 (was 18.18). Node 18 and 20 are end-of-life and no
+  longer receive security fixes. CI tests Node 22, 24 and 26; the drift canary
+  runs on Node 26.
+
 ## 3.1.1 — 2026-09-10
 
 ### Fixed

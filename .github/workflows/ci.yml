@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [18, 20, 22, 24]
+        node: [22, 24, 26]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: "${{ matrix.node }}" }
       - run: npm test
 
@@ -32,9 +32,9 @@ jobs:
       CODEX_COLLAB_REQUEST_TIMEOUT_MS: "30000"
       CODEX_COLLAB_TURN_TIMEOUT_MS: "45000"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: "26" }
       - name: Install real Codex CLI
         run: npm install -g @openai/codex@${{ matrix.codex }}
       - name: Handshake + read-only turn (auth may be absent; we assert the client speaks the protocol)
