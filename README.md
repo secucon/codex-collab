@@ -13,7 +13,7 @@ For everyday review/delegate/background work, use OpenAI's official plugin (`ope
 ## Requirements
 
 - Claude Code
-- Node.js >= 18.18
+- Node.js >= 22
 - OpenAI Codex CLI (`npm install -g @openai/codex`, then `codex login`)
 
 ## Install
@@ -61,4 +61,4 @@ Resumed debate prompts send the new candidate instead of repeating Codex's previ
 
 Hang protection: JSON-RPC requests time out after 30s and an acknowledged turn times out after 10 minutes (override via `CODEX_COLLAB_REQUEST_TIMEOUT_MS` / `CODEX_COLLAB_TURN_TIMEOUT_MS`). A timed-out turn is interrupted; shutdown sends SIGTERM after 50ms and SIGKILL after 1s if necessary. `turn`/`check` write failure markers before connecting. The non-interactive client declines permission/elicitation requests and explicitly rejects unsupported server requests.
 
-CI runs unit tests on Node 18/20/22/24, a required Codex 0.154.0 canary and an advisory latest-CLI canary. Only explicit post-handshake authentication failures are tolerated; invalid parameters and timeouts fail the canary. An unauthenticated canary does not verify model output or structured-schema acceptance. A failed or interrupted debate stops; do not remove a round lock while a prior invocation might still be alive.
+CI runs unit tests on Node 22/24/26, a required Codex 0.154.0 canary and an advisory latest-CLI canary. Only explicit post-handshake authentication failures are tolerated; invalid parameters and timeouts fail the canary. An unauthenticated canary does not verify model output or structured-schema acceptance. A failed or interrupted debate stops; do not remove a round lock while a prior invocation might still be alive.
